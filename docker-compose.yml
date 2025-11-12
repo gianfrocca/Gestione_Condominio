@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   condominio:
     build:
-      context: .
+      context: /share/Container/Gestione_Condominio
       dockerfile: Dockerfile
     container_name: gestione-condominio
     restart: unless-stopped
