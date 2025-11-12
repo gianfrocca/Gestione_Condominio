@@ -39,6 +39,10 @@ const reportsDir = join(dataDir, 'reports');
 // Inizializza database
 await initDatabase();
 
+// Inizializza dati di esempio (solo al primo avvio)
+import { initializeSampleData } from './init-data.js';
+await initializeSampleData();
+
 // Routes
 app.get('/', (req, res) => {
   res.json({
