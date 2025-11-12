@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  condominio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gestione-condominio
+    restart: unless-stopped
+    ports:
+      - "5173:5173"  # Frontend
+      - "3000:3000"  # Backend API
+    volumes:
+      # Volume per database e files persistenti
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - condominio-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  condominio-network:
+    driver: bridge
+
+volumes:
+  condominio-data:
+    driver: local
