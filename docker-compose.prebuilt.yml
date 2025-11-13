@@ -1,8 +1,6 @@
 services:
   condominio:
-    build:
-      context: /share/Container/Gestione_Condominio
-      dockerfile: Dockerfile
+    image: gianfrocca/gestione-condominio:latest
     container_name: gestione-condominio
     restart: unless-stopped
     ports:

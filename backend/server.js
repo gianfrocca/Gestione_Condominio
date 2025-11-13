@@ -39,6 +39,10 @@ const reportsDir = join(dataDir, 'reports');
 // Inizializza database
 await initDatabase();
 
+// Inizializza dati di esempio (solo al primo avvio)
+import { initializeSampleData } from './init-data.js';
+await initializeSampleData();
+
 // Routes
 app.get('/', (req, res) => {
   res.json({
@@ -71,17 +75,27 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Serve frontend statico (dopo le API routes)
+const frontendPath = join(__dirname, '../frontend/dist');
+if (existsSync(frontendPath)) {
+  app.use(express.static(frontendPath));
+
+  // Catch-all route per React Router (deve essere dopo tutte le altre routes)
+  app.get('*', (req, res) => {
+    res.sendFile(join(frontendPath, 'index.html'));
+  });
+
+  console.log(`✅ Frontend servito da: ${frontendPath}`);
+} else {
+  console.log(`⚠️  Frontend non trovato in: ${frontendPath}`);
+}
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(err.status || 500).json({
     error: err.message || 'Errore interno del server'
   });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint non trovato' });
 });
 
 // Avvia server
