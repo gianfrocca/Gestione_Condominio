@@ -1,28 +1,45 @@
-# Usa Node.js completo (più stabile di Alpine)
-FROM node:18
+# Usa Node.js completo (Debian-based per migliore compatibilità)
+FROM node:18-bullseye
 
-WORKDIR /app
-
-# Installa dipendenze di sistema per SQLite e PDF
+# Installa dipendenze di sistema PRIMA di tutto
 RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
     sqlite3 \
+    libsqlite3-dev \
     libcairo2-dev \
     libpango1.0-dev \
     libjpeg-dev \
     libgif-dev \
     librsvg2-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia tutto il progetto
-COPY . .
+WORKDIR /app
 
-# Installa dipendenze backend (con cache npm)
+# Copia package files per cache layer (esplicitamente)
+COPY backend/package.json backend/package-lock.json ./backend/
+COPY frontend/package.json frontend/package-lock.json ./frontend/
+
+# Installa dipendenze backend con rebuild forzato per native modules
 WORKDIR /app/backend
-RUN npm ci --production --prefer-offline --no-audit
+RUN npm ci --production --prefer-offline --no-audit || \
+    (npm cache clean --force && npm install --production)
 
-# Installa dipendenze frontend e builda
+# Installa dipendenze frontend
 WORKDIR /app/frontend
-RUN npm ci --prefer-offline --no-audit && npm run build
+RUN npm ci --prefer-offline --no-audit || \
+    (npm cache clean --force && npm install)
+
+# Copia tutto il codice sorgente
+WORKDIR /app
+COPY backend ./backend
+COPY frontend ./frontend
+
+# Build frontend
+WORKDIR /app/frontend
+RUN npm run build
 
 # Torna alla root
 WORKDIR /app
