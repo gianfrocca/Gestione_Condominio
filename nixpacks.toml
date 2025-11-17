@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "python3", "gcc", "g++", "make", "pkg-config", "cairo", "pango", "libpng", "libjpeg", "giflib", "librsvg", "sqlite"]
+
+[phases.install]
+cmds = [
+  "cd backend && npm ci --production --prefer-offline --no-audit",
+  "cd frontend && npm ci --prefer-offline --no-audit"
+]
+
+[phases.build]
+cmds = ["cd frontend && npm run build"]
+
+[start]
+cmd = "node backend/server.js"
