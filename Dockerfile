@@ -18,9 +18,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copia package files per cache layer
-COPY backend/package*.json ./backend/
-COPY frontend/package*.json ./frontend/
+# Copia package files per cache layer (esplicitamente)
+COPY backend/package.json backend/package-lock.json ./backend/
+COPY frontend/package.json frontend/package-lock.json ./frontend/
 
 # Installa dipendenze backend con rebuild forzato per native modules
 WORKDIR /app/backend
