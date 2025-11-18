@@ -13,6 +13,8 @@ function Bills() {
     type: 'electricity',
     amount: '',
     provider: '',
+    bill_period_start: '',
+    bill_period_end: '',
     notes: ''
   });
   const [selectedFile, setSelectedFile] = useState(null);
@@ -43,6 +45,8 @@ function Bills() {
       formDataToSend.append('type', formData.type);
       formDataToSend.append('amount', formData.amount);
       formDataToSend.append('provider', formData.provider);
+      formDataToSend.append('bill_period_start', formData.bill_period_start || '');
+      formDataToSend.append('bill_period_end', formData.bill_period_end || '');
       formDataToSend.append('notes', formData.notes);
 
       if (selectedFile) {
@@ -57,6 +61,8 @@ function Bills() {
         type: 'electricity',
         amount: '',
         provider: '',
+        bill_period_start: '',
+        bill_period_end: '',
         notes: ''
       });
       setSelectedFile(null);
@@ -159,6 +165,30 @@ function Bills() {
                   placeholder="Es: ENEL, ESTRA"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Inizio Periodo Riferimento
+                </label>
+                <input
+                  type="date"
+                  value={formData.bill_period_start}
+                  onChange={(e) => setFormData({ ...formData, bill_period_start: e.target.value })}
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fine Periodo Riferimento
+                </label>
+                <input
+                  type="date"
+                  value={formData.bill_period_end}
+                  onChange={(e) => setFormData({ ...formData, bill_period_end: e.target.value })}
+                  className="input"
+                />
+              </div>
             </div>
 
             <div>
@@ -211,6 +241,7 @@ function Bills() {
                 <th>Data</th>
                 <th>Tipo</th>
                 <th>Fornitore</th>
+                <th>Periodo Riferimento</th>
                 <th>Importo</th>
                 <th>File</th>
                 <th>Azioni</th>
@@ -219,7 +250,7 @@ function Bills() {
             <tbody className="bg-white divide-y divide-gray-200">
               {bills.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-8 text-gray-500">
+                  <td colSpan="7" className="text-center py-8 text-gray-500">
                     Nessuna bolletta registrata
                   </td>
                 </tr>
@@ -233,6 +264,17 @@ function Bills() {
                       </span>
                     </td>
                     <td>{bill.provider || '-'}</td>
+                    <td className="text-sm text-gray-600">
+                      {bill.bill_period_start && bill.bill_period_end ? (
+                        <>
+                          {format(new Date(bill.bill_period_start), 'dd/MM/yyyy')}
+                          {' - '}
+                          {format(new Date(bill.bill_period_end), 'dd/MM/yyyy')}
+                        </>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
                     <td className="font-semibold">€{parseFloat(bill.amount).toFixed(2)}</td>
                     <td>
                       {bill.file_path ? (

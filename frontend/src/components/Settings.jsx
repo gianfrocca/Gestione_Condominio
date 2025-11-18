@@ -427,6 +427,7 @@ function Settings() {
                     <th>Nome</th>
                     <th>Inquilino</th>
                     <th>Superficie (mq)</th>
+                    <th>Abitato</th>
                     <th>Commerciale</th>
                     <th>Foglio</th>
                     <th>Particella</th>
@@ -463,6 +464,14 @@ function Settings() {
                           onChange={(e) => setNewUnit({ ...newUnit, surface_area: e.target.value })}
                           placeholder="mq"
                           className="input input-sm w-24"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={newUnit.is_inhabited}
+                          onChange={(e) => setNewUnit({ ...newUnit, is_inhabited: e.target.checked })}
+                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                         />
                       </td>
                       <td>
@@ -552,6 +561,14 @@ function Settings() {
                         <td>
                           <input
                             type="checkbox"
+                            checked={editingUnit.is_inhabited}
+                            onChange={(e) => setEditingUnit({ ...editingUnit, is_inhabited: e.target.checked })}
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
                             checked={editingUnit.is_commercial}
                             onChange={(e) => setEditingUnit({ ...editingUnit, is_commercial: e.target.checked })}
                             className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
@@ -605,6 +622,11 @@ function Settings() {
                         <td className="font-medium">{unit.number}</td>
                         <td>{unit.name}</td>
                         <td>{unit.surface_area}</td>
+                        <td>
+                          <span className={`badge ${unit.is_inhabited ? 'badge-green' : 'badge-gray'}`}>
+                            {unit.is_inhabited ? 'Sì' : 'No'}
+                          </span>
+                        </td>
                         <td>
                           <span className={`badge ${unit.is_commercial ? 'badge-blue' : 'badge-gray'}`}>
                             {unit.is_commercial ? 'Sì' : 'No'}
