@@ -303,7 +303,8 @@ function Readings() {
       console.log(`\n📤 Sending ${readingsToSave.length} readings to backend for ${activeTab}:`);
       console.log(JSON.stringify(readingsToSave, null, 2));
 
-      const response = await readingsAPI.createBatch({ readings: readingsToSave });
+      // NOTA: createBatch già wrappa in { readings: ... }, quindi passiamo solo l'array
+      const response = await readingsAPI.createBatch(readingsToSave);
       console.log(`  ✅ Backend response:`, response.data);
 
       alert('Letture salvate con successo!');
