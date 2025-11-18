@@ -63,7 +63,7 @@ function App() {
             </button>
           </div>
 
-          <nav className="mt-6 px-3">
+          <nav className="mt-6 px-3 pb-24 overflow-y-auto" style={{ height: 'calc(100vh - 4rem - 5rem)' }}>
             {navigation.map((item) => {
               const Icon = item.icon;
               return (
