@@ -1,43 +1,11 @@
-# Dependencies
 node_modules/
-# package-lock.json - NEEDED for npm ci in Docker
-
-# Build outputs
-dist/
-build/
-
-# Environment variables
+*.log
 .env
-.env.local
-.env.production
-
-# Database
-*.db
-*.db-journal
+.DS_Store
 data/*.db
-
-# Uploaded files
 data/bills/*
 data/reports/*
 !data/bills/.gitkeep
 !data/reports/.gitkeep
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-# Temporary files
-tmp/
-temp/

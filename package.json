@@ -1,9 +1,7 @@
 {
   "name": "gestione-condominio",
   "version": "1.0.0",
-  "description": "Sistema per gestione e ripartizione spese condominiali",
   "scripts": {
-    "build": "cd backend && npm ci --production && cd ../frontend && npm ci && npm run build",
     "start": "node backend/server.js"
   },
   "engines": {
