@@ -210,14 +210,37 @@ router.delete('/:id', async (req, res) => {
 });
 
 // GET: Ottieni contabilizzatori per unità
+// CRITICAL: Supporta filtro opzionale per type per prevenire cross-contamination
 router.get('/meters/unit/:unit_id', async (req, res) => {
   try {
-    const meters = await allQuery(
-      'SELECT * FROM meters WHERE unit_id = ?',
-      [req.params.unit_id]
-    );
+    const { type } = req.query;
+
+    let query = 'SELECT * FROM meters WHERE unit_id = ?';
+    const params = [req.params.unit_id];
+
+    // CRITICAL: Se specificato type, filtra SOLO per quel tipo
+    if (type) {
+      query += ' AND type = ?';
+      params.push(type);
+      console.log(`🔎 GET meters: unit_id=${req.params.unit_id}, type=${type}`);
+    } else {
+      console.log(`🔎 GET meters: unit_id=${req.params.unit_id}, ALL TYPES`);
+    }
+
+    const meters = await allQuery(query, params);
+
+    console.log(`📊 Found ${meters.length} meter(s) for query`);
+    if (meters.length > 0) {
+      meters.forEach(m => {
+        console.log(`   - Meter ID ${m.id}: unit=${m.unit_id}, type=${m.type}`);
+      });
+    } else {
+      console.log(`   ⚠️ No meters found`);
+    }
+
     res.json(meters);
   } catch (error) {
+    console.error('❌ Error getting meters:', error);
     res.status(500).json({ error: error.message });
   }
 });

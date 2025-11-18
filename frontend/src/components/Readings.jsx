@@ -95,24 +95,40 @@ function Readings() {
         try {
           console.log(`\n🏢 ===== Processing unit ${unit.number} (ID: ${unit.id}) for ${activeTab} =====`);
 
-          // Get meters for this unit
-          const { data: meters } = await readingsAPI.getMetersByUnit(unit.id);
-          console.log(`  📊 API returned ${meters?.length || 0} meters for unit ${unit.id}`);
+          // CRITICAL FIX: Filtra i meter direttamente nel backend passando activeTab
+          console.log(`  🔎 Calling API: getMetersByUnit(${unit.id}, "${activeTab}")`);
+          const { data: meters } = await readingsAPI.getMetersByUnit(unit.id, activeTab);
+          console.log(`  📊 Backend returned ${meters?.length || 0} meter(s) for unit ${unit.id} with type=${activeTab}`);
 
           if (meters && meters.length > 0) {
-            console.log(`  📊 All meters for unit ${unit.id}:`, meters.map(m => ({
+            console.log(`  📊 Meters returned by backend:`, meters.map(m => ({
               id: m.id,
               type: m.type,
-              unit_id: m.unit_id
+              unit_id: m.unit_id,
+              meter_code: m.meter_code
             })));
           }
 
-          // Find meter for current tab type ONLY
-          console.log(`  🔎 Looking for meter with type="${activeTab}"...`);
-          const meter = meters?.find(m => m.type === activeTab);
+          // CRITICAL: Con filtro backend, dovremmo ricevere 0 o 1 meter max
+          if (meters && meters.length > 1) {
+            console.error(`  ❌ DATABASE INCONSISTENCY: Found ${meters.length} meters for unit ${unit.id} with type ${activeTab}!`);
+            console.error(`  ❌ Should be max 1! Duplicate meters:`, meters);
+            alert(`⚠️ ATTENZIONE: Trovati meter duplicati per unità ${unit.number}! Contatta l'amministratore.`);
+          }
+
+          // Prendi il primo (e dovrebbe essere unico) meter
+          const meter = meters?.[0];
 
           if (meter) {
-            console.log(`  ✅ Found meter:`, {
+            // CRITICAL VALIDATION: Doppio check che il meter abbia il tipo corretto
+            if (meter.type !== activeTab) {
+              console.error(`  ❌ CRITICAL BUG: Meter returned has type "${meter.type}" but we requested "${activeTab}"!`);
+              console.error(`  ❌ This should NEVER happen with backend filtering!`);
+              alert(`⚠️ ERRORE CRITICO: Meter type mismatch! Meter type="${meter.type}", expected="${activeTab}"`);
+              continue; // Skip this unit
+            }
+
+            console.log(`  ✅ Found meter ID ${meter.id} with correct type "${meter.type}":`, {
               id: meter.id,
               type: meter.type,
               unit_id: meter.unit_id,

@@ -74,7 +74,11 @@ export const readingsAPI = {
   createBatch: (readings) => api.post('/readings/batch', { readings }),
   update: (id, data) => api.put(`/readings/${id}`, data),
   delete: (id) => api.delete(`/readings/${id}`),
-  getMetersByUnit: (unitId) => api.get(`/readings/meters/unit/${unitId}`),
+  // CRITICAL: Supporta filtro per type per prevenire cross-contamination
+  getMetersByUnit: (unitId, meterType) => {
+    const params = meterType ? { type: meterType } : {};
+    return api.get(`/readings/meters/unit/${unitId}`, { params });
+  },
 };
 
 // Bills API
