@@ -7,7 +7,7 @@ function Readings() {
   const [units, setUnits] = useState([]);
   const [readings, setReadings] = useState({}); // {unit_id: {value: '', date: ''}}
   const [previousReadings, setPreviousReadings] = useState({}); // {unit_id: {value, date, meter_id}}
-  const [historyReadings, setHistoryReadings] = useState([]); // All readings for current tab
+  const [historyReadings, setHistoryReadings] = useState([]);
   const [filteredHistory, setFilteredHistory] = useState([]);
   const [editingReading, setEditingReading] = useState(null);
   const [selectedReadings, setSelectedReadings] = useState(new Set());
@@ -34,15 +34,19 @@ function Readings() {
 
   useEffect(() => {
     if (units.length > 0) {
-      // Reset quando cambio tab per evitare confusione
+      console.log(`🔄 TAB CHANGED TO: ${activeTab} - Resetting all state`);
+      // Reset completo quando cambio tab
       setPreviousReadings({});
       setReadings({});
       setHistoryReadings([]);
       setSelectedReadings(new Set());
       setCurrentPage(1);
 
-      loadPreviousReadings();
-      loadHistoryReadings();
+      // Carica con un piccolo delay per assicurare il reset
+      setTimeout(() => {
+        loadPreviousReadings();
+        loadHistoryReadings();
+      }, 100);
     }
   }, [units, activeTab]);
 
@@ -54,9 +58,10 @@ function Readings() {
     try {
       setLoading(true);
       const { data } = await unitsAPI.getAll();
+      console.log(`📋 Loaded ${data.length} units`);
       setUnits(data);
     } catch (error) {
-      console.error('Errore caricamento unità:', error);
+      console.error('❌ Errore caricamento unità:', error);
       alert('Errore durante il caricamento delle unità');
     } finally {
       setLoading(false);
@@ -64,49 +69,76 @@ function Readings() {
   };
 
   const loadPreviousReadings = async () => {
+    console.log(`\n🔍 === LOADING PREVIOUS READINGS FOR ${activeTab} ===`);
     try {
       const previous = {};
 
       for (const unit of units) {
         // Skip heating/hot_water for commercial units
         if (unit.is_commercial && (activeTab === 'heating' || activeTab === 'hot_water')) {
+          console.log(`⏭️ Skip unit ${unit.number} (commercial, tipo: ${activeTab})`);
           continue;
         }
 
         try {
-          // IMPORTANTE: Filtro esplicito per tipo di contatore
+          console.log(`\n🏢 Processing unit ${unit.number} (ID: ${unit.id}) for ${activeTab}...`);
+
+          // Get meters for this unit
           const { data: meters } = await readingsAPI.getMetersByUnit(unit.id);
+          console.log(`  📊 Found ${meters?.length || 0} meters for unit ${unit.id}:`, meters);
+
+          // Find meter for current tab type
           const meter = meters?.find(m => m.type === activeTab);
 
           if (meter) {
-            // Get readings SOLO per questo meter_id specifico
+            console.log(`  ✅ Found meter ID ${meter.id} for type ${activeTab}`);
+
+            // Get ALL readings for this specific meter
             const { data: allReadings } = await readingsAPI.getAll({ meter_id: meter.id });
+            console.log(`  📚 Found ${allReadings?.length || 0} readings for meter ${meter.id}`);
 
             if (allReadings && allReadings.length > 0) {
-              // Sort by date descending and get the latest
+              // Log all readings
+              console.log(`  📖 All readings:`, allReadings.map(r => ({
+                id: r.id,
+                date: r.reading_date,
+                value: r.value
+              })));
+
+              // Sort by date descending
               const sorted = allReadings.sort((a, b) =>
                 new Date(b.reading_date) - new Date(a.reading_date)
               );
 
+              const latestReading = sorted[0];
+              console.log(`  🎯 Latest reading:`, {
+                date: latestReading.reading_date,
+                value: latestReading.value,
+                type: typeof latestReading.value
+              });
+
               previous[unit.id] = {
-                value: sorted[0].value,
-                date: sorted[0].reading_date,
+                value: parseFloat(latestReading.value),  // Assicura che sia un numero
+                date: latestReading.reading_date,
                 meter_id: meter.id
               };
 
-              console.log(`✅ Unit ${unit.number} (${activeTab}): Previous reading = ${sorted[0].value}, meter_id = ${meter.id}`);
+              console.log(`  ✅ Set previous for unit ${unit.id}:`, previous[unit.id]);
+            } else {
+              console.log(`  ⚠️ No readings found for meter ${meter.id}`);
             }
           } else {
-            console.log(`⚠️ Nessun meter trovato per unit ${unit.number}, tipo ${activeTab}`);
+            console.log(`  ⚠️ No meter found for unit ${unit.number}, type ${activeTab}`);
           }
         } catch (err) {
-          console.error(`Error loading readings for unit ${unit.id}:`, err);
+          console.error(`  ❌ Error loading readings for unit ${unit.id}:`, err);
         }
       }
 
+      console.log(`\n📦 FINAL previousReadings state:`, previous);
       setPreviousReadings(previous);
 
-      // Initialize readings with today's date
+      // Initialize new readings with today's date
       const initialReadings = {};
       units.forEach(unit => {
         if (!unit.is_commercial || activeTab === 'cold_water') {
@@ -118,19 +150,21 @@ function Readings() {
       });
       setReadings(initialReadings);
 
+      console.log(`✅ === PREVIOUS READINGS LOADED ===\n`);
+
     } catch (error) {
-      console.error('Errore caricamento letture precedenti:', error);
+      console.error('❌ Errore caricamento letture precedenti:', error);
     }
   };
 
   const loadHistoryReadings = async () => {
     try {
-      // IMPORTANTE: Filtro per meter_type per separare completamente i tipi
+      console.log(`📚 Loading history for meter_type: ${activeTab}`);
       const { data } = await readingsAPI.getAll({ meter_type: activeTab });
-      console.log(`📚 Loaded ${data?.length || 0} history readings for ${activeTab}`);
+      console.log(`✅ Loaded ${data?.length || 0} history readings for ${activeTab}`);
       setHistoryReadings(data || []);
     } catch (error) {
-      console.error('Errore caricamento storico:', error);
+      console.error('❌ Errore caricamento storico:', error);
     }
   };
 
@@ -146,7 +180,7 @@ function Readings() {
     }
 
     setFilteredHistory(filtered);
-    setCurrentPage(1); // Reset to first page when filtering
+    setCurrentPage(1);
   };
 
   const handleReadingChange = (unitId, field, value) => {
@@ -160,10 +194,25 @@ function Readings() {
   };
 
   const calculateConsumption = (unitId) => {
-    const current = parseFloat(readings[unitId]?.value || 0);
-    const previous = parseFloat(previousReadings[unitId]?.value || 0);
+    const currentValue = readings[unitId]?.value;
+    const previousValue = previousReadings[unitId]?.value;
 
-    if (!current || !previous) return null;
+    // FIX: Gestione corretta dello 0 - controlla se il valore è definito, non se è truthy
+    if (currentValue === '' || currentValue === null || currentValue === undefined) {
+      return null;
+    }
+
+    if (previousValue === null || previousValue === undefined) {
+      return null;
+    }
+
+    const current = parseFloat(currentValue);
+    const previous = parseFloat(previousValue);
+
+    // Anche 0 è un valore valido!
+    if (isNaN(current) || isNaN(previous)) {
+      return null;
+    }
 
     const consumption = current - previous;
     return consumption >= 0 ? consumption : null;
@@ -172,19 +221,23 @@ function Readings() {
   const handleSave = async () => {
     try {
       setSaving(true);
+      console.log(`\n💾 === SAVING READINGS ===`);
 
       const readingsToSave = [];
 
       for (const [unitId, reading] of Object.entries(readings)) {
-        if (reading.value && reading.date) {
-          readingsToSave.push({
+        if (reading.value !== '' && reading.value !== null && reading.value !== undefined && reading.date) {
+          const readingData = {
             unit_id: parseInt(unitId),
             meter_type: activeTab,
             meter_id: previousReadings[unitId]?.meter_id || null,
             reading_date: reading.date,
             value: parseFloat(reading.value),
             notes: null
-          });
+          };
+
+          console.log(`  📝 Preparing reading for unit ${unitId}:`, readingData);
+          readingsToSave.push(readingData);
         }
       }
 
@@ -193,15 +246,25 @@ function Readings() {
         return;
       }
 
-      await readingsAPI.createBatch(readingsToSave);
+      console.log(`  📤 Sending ${readingsToSave.length} readings to backend...`);
+      const response = await readingsAPI.createBatch(readingsToSave);
+      console.log(`  ✅ Backend response:`, response.data);
+
       alert('Letture salvate con successo!');
 
-      // Reload data
+      // Aspetta un attimo per assicurare che il DB sia aggiornato
+      console.log(`  ⏳ Waiting for DB to update...`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Ricarica i dati
+      console.log(`  🔄 Reloading data...`);
       await loadPreviousReadings();
       await loadHistoryReadings();
 
+      console.log(`✅ === SAVE COMPLETE ===\n`);
+
     } catch (error) {
-      console.error('Errore salvataggio letture:', error);
+      console.error('❌ Errore salvataggio letture:', error);
       alert('Errore durante il salvataggio delle letture: ' + (error.response?.data?.error || error.message));
     } finally {
       setSaving(false);
@@ -221,6 +284,9 @@ function Readings() {
       });
       alert('Lettura aggiornata con successo!');
       setEditingReading(null);
+
+      // Aspetta e ricarica
+      await new Promise(resolve => setTimeout(resolve, 300));
       await loadPreviousReadings();
       await loadHistoryReadings();
     } catch (error) {
@@ -235,6 +301,9 @@ function Readings() {
     try {
       await readingsAPI.delete(id);
       alert('Lettura eliminata con successo!');
+
+      // Aspetta e ricarica
+      await new Promise(resolve => setTimeout(resolve, 300));
       await loadPreviousReadings();
       await loadHistoryReadings();
     } catch (error) {
@@ -257,6 +326,8 @@ function Readings() {
       }
       alert(`${selectedReadings.size} letture eliminate con successo!`);
       setSelectedReadings(new Set());
+
+      await new Promise(resolve => setTimeout(resolve, 300));
       await loadPreviousReadings();
       await loadHistoryReadings();
     } catch (error) {
@@ -279,6 +350,8 @@ function Readings() {
       }
       alert('Tutte le letture sono state eliminate!');
       setSelectedReadings(new Set());
+
+      await new Promise(resolve => setTimeout(resolve, 300));
       await loadPreviousReadings();
       await loadHistoryReadings();
     } catch (error) {
@@ -426,14 +499,17 @@ function Readings() {
                       />
                     </td>
                     <td className="text-gray-600 font-medium">
-                      {prevReading ? prevReading.value.toFixed(2) : '-'}
+                      {prevReading !== undefined && prevReading !== null ?
+                        (typeof prevReading.value === 'number' ? prevReading.value.toFixed(2) : prevReading.value)
+                        : '-'
+                      }
                     </td>
                     <td className="text-gray-600">
                       {prevReading ? formatDate(prevReading.date) : '-'}
                     </td>
                     <td>
                       {consumption !== null ? (
-                        <span className={`font-semibold ${consumption > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        <span className={`font-semibold ${consumption > 0 ? 'text-green-600' : consumption === 0 ? 'text-gray-600' : 'text-gray-400'}`}>
                           {consumption.toFixed(2)}
                         </span>
                       ) : (
@@ -683,14 +759,14 @@ function Readings() {
 
       {/* Info box */}
       <div className="card bg-blue-50 border-blue-200">
-        <h3 className="font-semibold text-blue-900 mb-2">ℹ️ Informazioni</h3>
+        <h3 className="font-semibold text-blue-900 mb-2">ℹ️ Informazioni & Debug</h3>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• Ogni tipo di contatore (Acqua Fredda/Calda/Riscaldamento) ha il proprio <strong>storico separato</strong></li>
-          <li>• Il <strong>Consumo</strong> viene calcolato automaticamente sottraendo la lettura precedente dal valore attuale</li>
-          <li>• La <strong>Lettura Precedente</strong> è l'ultima lettura registrata per questa unità e questo tipo di contatore</li>
+          <li>• Il <strong>Consumo</strong> viene calcolato automaticamente (anche se la lettura precedente è 0)</li>
+          <li>• La <strong>Lettura Precedente</strong> è l'ultima lettura registrata per questa unità e questo tipo</li>
+          <li>• <strong>Debug:</strong> Apri la Console Browser (F12) per vedere log dettagliati del caricamento letture</li>
           <li>• Usa i <strong>filtri per periodo</strong> per cercare letture in un range di date specifico</li>
           <li>• Seleziona multiple letture con i checkbox per <strong>eliminarle in blocco</strong></li>
-          <li>• Lo storico è <strong>paginato</strong> (10 letture per pagina) per facilitare la navigazione</li>
         </ul>
       </div>
     </div>
