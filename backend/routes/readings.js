@@ -83,7 +83,33 @@ router.post('/batch', async (req, res) => {
     const results = [];
 
     for (const reading of readings) {
-      const { meter_id, reading_date, value, notes } = reading;
+      let { meter_id, unit_id, meter_type, reading_date, value, notes } = reading;
+
+      // Se non c'è meter_id ma ci sono unit_id e meter_type, crea o trova il meter
+      if (!meter_id && unit_id && meter_type) {
+        // Cerca se esiste già un meter per questa unità e tipo
+        const existingMeter = await getQuery(
+          'SELECT id FROM meters WHERE unit_id = ? AND type = ?',
+          [unit_id, meter_type]
+        );
+
+        if (existingMeter) {
+          meter_id = existingMeter.id;
+        } else {
+          // Crea nuovo meter
+          const meterResult = await runQuery(
+            'INSERT INTO meters (unit_id, type, meter_code) VALUES (?, ?, ?)',
+            [unit_id, meter_type, `${meter_type}-${unit_id}`]
+          );
+          meter_id = meterResult.id;
+          console.log(`✅ Meter creato: unit_id=${unit_id}, type=${meter_type}, meter_id=${meter_id}`);
+        }
+      }
+
+      if (!meter_id) {
+        console.error('Nessun meter_id trovato o creato per:', reading);
+        continue;
+      }
 
       const result = await runQuery(
         `INSERT INTO readings (meter_id, reading_date, value, notes)
@@ -99,6 +125,7 @@ router.post('/batch', async (req, res) => {
       ids: results
     });
   } catch (error) {
+    console.error('Error in batch insert:', error);
     res.status(500).json({ error: error.message });
   }
 });

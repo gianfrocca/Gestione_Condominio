@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Thermometer, Droplet, Snowflake } from 'lucide-react';
+import { Save, Thermometer, Droplet, Snowflake, Edit2, Trash2, Check, X, History } from 'lucide-react';
 import { readingsAPI, unitsAPI } from '../services/api';
 
 function Readings() {
@@ -7,6 +7,8 @@ function Readings() {
   const [units, setUnits] = useState([]);
   const [readings, setReadings] = useState({}); // {unit_id: {value: '', date: ''}}
   const [previousReadings, setPreviousReadings] = useState({}); // {unit_id: {value, date}}
+  const [historyReadings, setHistoryReadings] = useState([]); // All readings for current tab
+  const [editingReading, setEditingReading] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -23,6 +25,7 @@ function Readings() {
   useEffect(() => {
     if (units.length > 0) {
       loadPreviousReadings();
+      loadHistoryReadings();
     }
   }, [units, activeTab]);
 
@@ -94,6 +97,15 @@ function Readings() {
     }
   };
 
+  const loadHistoryReadings = async () => {
+    try {
+      const { data } = await readingsAPI.getAll({ meter_type: activeTab });
+      setHistoryReadings(data || []);
+    } catch (error) {
+      console.error('Errore caricamento storico:', error);
+    }
+  };
+
   const handleReadingChange = (unitId, field, value) => {
     setReadings(prev => ({
       ...prev,
@@ -122,17 +134,12 @@ function Readings() {
 
       for (const [unitId, reading] of Object.entries(readings)) {
         if (reading.value && reading.date) {
-          // Get or create meter_id
-          let meterId = previousReadings[unitId]?.meter_id;
-
-          if (!meterId) {
-            // Need to create meter first (this should be handled by backend)
-            console.warn(`No meter found for unit ${unitId}, type ${activeTab}`);
-            continue;
-          }
-
+          // Prepara la lettura con unit_id e meter_type
+          // Il backend creerà automaticamente il meter se non esiste
           readingsToSave.push({
-            meter_id: meterId,
+            unit_id: parseInt(unitId),
+            meter_type: activeTab,
+            meter_id: previousReadings[unitId]?.meter_id || null,
             reading_date: reading.date,
             value: parseFloat(reading.value),
             notes: null
@@ -148,14 +155,50 @@ function Readings() {
       await readingsAPI.createBatch(readingsToSave);
       alert('Letture salvate con successo!');
 
-      // Reload previous readings
+      // Reload data
       await loadPreviousReadings();
+      await loadHistoryReadings();
 
     } catch (error) {
       console.error('Errore salvataggio letture:', error);
-      alert('Errore durante il salvataggio delle letture');
+      alert('Errore durante il salvataggio delle letture: ' + (error.response?.data?.error || error.message));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEditReading = (reading) => {
+    setEditingReading({ ...reading });
+  };
+
+  const handleUpdateReading = async () => {
+    try {
+      await readingsAPI.update(editingReading.id, {
+        reading_date: editingReading.reading_date,
+        value: editingReading.value,
+        notes: editingReading.notes
+      });
+      alert('Lettura aggiornata con successo!');
+      setEditingReading(null);
+      await loadPreviousReadings();
+      await loadHistoryReadings();
+    } catch (error) {
+      console.error('Errore aggiornamento lettura:', error);
+      alert('Errore durante l\'aggiornamento della lettura');
+    }
+  };
+
+  const handleDeleteReading = async (id) => {
+    if (!confirm('Sei sicuro di voler eliminare questa lettura?')) return;
+
+    try {
+      await readingsAPI.delete(id);
+      alert('Lettura eliminata con successo!');
+      await loadPreviousReadings();
+      await loadHistoryReadings();
+    } catch (error) {
+      console.error('Errore eliminazione lettura:', error);
+      alert('Errore durante l\'eliminazione della lettura');
     }
   };
 
@@ -229,7 +272,7 @@ function Readings() {
       <div className="card">
         <div className="flex items-center mb-4">
           {currentTabConfig && <currentTabConfig.icon className={`h-6 w-6 mr-2 text-${currentTabConfig.color}-600`} />}
-          <h2 className="text-xl font-semibold">{currentTabConfig?.name}</h2>
+          <h2 className="text-xl font-semibold">Inserimento Nuove Letture</h2>
         </div>
 
         <div className="overflow-x-auto">
@@ -301,6 +344,116 @@ function Readings() {
         )}
       </div>
 
+      {/* History Section */}
+      <div className="card">
+        <div className="flex items-center mb-4">
+          <History className="h-6 w-6 mr-2 text-gray-600" />
+          <h2 className="text-xl font-semibold">Storico Letture - {currentTabConfig?.name}</h2>
+        </div>
+
+        {historyReadings.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <History className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p>Nessuna lettura registrata</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Unità</th>
+                  <th>Inquilino</th>
+                  <th>Valore</th>
+                  <th>Note</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {historyReadings.map((reading) => (
+                  editingReading?.id === reading.id ? (
+                    <tr key={reading.id} className="bg-yellow-50">
+                      <td>
+                        <input
+                          type="date"
+                          value={editingReading.reading_date}
+                          onChange={(e) => setEditingReading({ ...editingReading, reading_date: e.target.value })}
+                          className="input input-sm"
+                        />
+                      </td>
+                      <td>{reading.unit_number}</td>
+                      <td>{reading.unit_name}</td>
+                      <td>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingReading.value}
+                          onChange={(e) => setEditingReading({ ...editingReading, value: e.target.value })}
+                          className="input input-sm w-32"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={editingReading.notes || ''}
+                          onChange={(e) => setEditingReading({ ...editingReading, notes: e.target.value })}
+                          className="input input-sm"
+                          placeholder="Note"
+                        />
+                      </td>
+                      <td>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={handleUpdateReading}
+                            className="text-green-600 hover:text-green-900"
+                            title="Salva"
+                          >
+                            <Check className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => setEditingReading(null)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Annulla"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={reading.id}>
+                      <td className="font-medium">{formatDate(reading.reading_date)}</td>
+                      <td>{reading.unit_number}</td>
+                      <td>{reading.unit_name}</td>
+                      <td className="font-semibold">{parseFloat(reading.value).toFixed(2)}</td>
+                      <td className="text-sm text-gray-600">{reading.notes || '-'}</td>
+                      <td>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEditReading(reading)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Modifica"
+                          >
+                            <Edit2 className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReading(reading.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Elimina"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Info box */}
       <div className="card bg-blue-50 border-blue-200">
         <h3 className="font-semibold text-blue-900 mb-2">ℹ️ Informazioni</h3>
@@ -309,6 +462,7 @@ function Readings() {
           <li>• La <strong>Lettura Precedente</strong> è l'ultima lettura registrata per questa unità</li>
           <li>• Inserisci la <strong>Data Lettura</strong> e il <strong>Valore Attuale</strong> rilevato dal contabilizzatore</li>
           <li>• Le unità commerciali hanno solo letture per Acqua Fredda</li>
+          <li>• Nello <strong>Storico</strong> puoi visualizzare, modificare ed eliminare le letture precedenti</li>
         </ul>
       </div>
     </div>
