@@ -43,8 +43,8 @@ await initDatabase();
 import { initializeSampleData } from './init-data.js';
 await initializeSampleData();
 
-// Routes
-app.get('/', (req, res) => {
+// API info endpoint
+app.get('/api', (req, res) => {
   res.json({
     message: 'API Gestione Condominio',
     version: '1.0.0',
@@ -59,21 +59,22 @@ app.get('/', (req, res) => {
   });
 });
 
-app.use('/api/units', unitsRouter);
-app.use('/api/readings', readingsRouter);
-app.use('/api/bills', billsRouter);
-app.use('/api/calculations', calculationsRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/reports', reportsRouter);
-
 // Health check
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
 });
+
+// API Routes
+app.use('/api/units', unitsRouter);
+app.use('/api/readings', readingsRouter);
+app.use('/api/bills', billsRouter);
+app.use('/api/calculations', calculationsRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/reports', reportsRouter);
 
 // Serve frontend statico (dopo le API routes)
 const frontendPath = join(__dirname, '../frontend/dist');
