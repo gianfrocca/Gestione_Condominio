@@ -34,15 +34,25 @@ function Readings() {
 
   useEffect(() => {
     if (units.length > 0) {
-      console.log(`🔄 TAB CHANGED TO: ${activeTab} - Resetting all state`);
-      // Reset completo quando cambio tab
+      console.log(`\n🔄 ========== TAB CHANGED TO: ${activeTab} ==========`);
+      console.log(`🧹 Resetting ALL state for clean slate...`);
+
+      // CRITICAL: Reset completo e immediato dello state
+      // Questo previene qualsiasi contaminazione tra tab
       setPreviousReadings({});
       setReadings({});
       setHistoryReadings([]);
+      setFilteredHistory([]);
       setSelectedReadings(new Set());
       setCurrentPage(1);
+      setEditingReading(null);
+      setDateFrom('');
+      setDateTo('');
 
-      // Carica con un piccolo delay per assicurare il reset
+      console.log(`✅ State reset complete`);
+      console.log(`⏳ Loading data for ${activeTab}...`);
+
+      // Carica con un piccolo delay per assicurare il reset completo dello state React
       setTimeout(() => {
         loadPreviousReadings();
         loadHistoryReadings();
@@ -69,7 +79,9 @@ function Readings() {
   };
 
   const loadPreviousReadings = async () => {
-    console.log(`\n🔍 === LOADING PREVIOUS READINGS FOR ${activeTab} ===`);
+    console.log(`\n🟢 ========== LOADING PREVIOUS READINGS FOR ${activeTab} ==========`);
+    console.log(`📋 Total units to process: ${units.length}`);
+
     try {
       const previous = {};
 
@@ -81,29 +93,43 @@ function Readings() {
         }
 
         try {
-          console.log(`\n🏢 Processing unit ${unit.number} (ID: ${unit.id}) for ${activeTab}...`);
+          console.log(`\n🏢 ===== Processing unit ${unit.number} (ID: ${unit.id}) for ${activeTab} =====`);
 
           // Get meters for this unit
           const { data: meters } = await readingsAPI.getMetersByUnit(unit.id);
-          console.log(`  📊 Found ${meters?.length || 0} meters for unit ${unit.id}:`, meters);
+          console.log(`  📊 API returned ${meters?.length || 0} meters for unit ${unit.id}`);
 
-          // Find meter for current tab type
+          if (meters && meters.length > 0) {
+            console.log(`  📊 All meters for unit ${unit.id}:`, meters.map(m => ({
+              id: m.id,
+              type: m.type,
+              unit_id: m.unit_id
+            })));
+          }
+
+          // Find meter for current tab type ONLY
+          console.log(`  🔎 Looking for meter with type="${activeTab}"...`);
           const meter = meters?.find(m => m.type === activeTab);
 
           if (meter) {
-            console.log(`  ✅ Found meter ID ${meter.id} for type ${activeTab}`);
+            console.log(`  ✅ Found meter:`, {
+              id: meter.id,
+              type: meter.type,
+              unit_id: meter.unit_id,
+              meter_code: meter.meter_code
+            });
 
-            // Get ALL readings for this specific meter
+            // CRITICAL: Get readings filtered by this specific meter_id
+            console.log(`  🔎 Fetching readings for meter_id=${meter.id}...`);
             const { data: allReadings } = await readingsAPI.getAll({ meter_id: meter.id });
-            console.log(`  📚 Found ${allReadings?.length || 0} readings for meter ${meter.id}`);
+            console.log(`  📚 API returned ${allReadings?.length || 0} readings`);
 
             if (allReadings && allReadings.length > 0) {
-              // Log all readings
-              console.log(`  📖 All readings:`, allReadings.map(r => ({
-                id: r.id,
-                date: r.reading_date,
-                value: r.value
-              })));
+              // Log all readings for this meter
+              console.log(`  📖 All readings for meter ${meter.id}:`);
+              allReadings.forEach((r, idx) => {
+                console.log(`    ${idx + 1}. Reading ID ${r.id}: date=${r.reading_date}, value=${r.value}, meter_type=${r.meter_type}`);
+              });
 
               // Sort by date descending
               const sorted = allReadings.sort((a, b) =>
@@ -111,46 +137,62 @@ function Readings() {
               );
 
               const latestReading = sorted[0];
-              console.log(`  🎯 Latest reading:`, {
+              console.log(`  🎯 Latest (most recent) reading:`, {
+                id: latestReading.id,
                 date: latestReading.reading_date,
                 value: latestReading.value,
+                meter_type: latestReading.meter_type,
                 type: typeof latestReading.value
               });
 
+              const parsedValue = parseFloat(latestReading.value);
+              console.log(`  🔢 Parsed value: ${parsedValue} (type: ${typeof parsedValue})`);
+
               previous[unit.id] = {
-                value: parseFloat(latestReading.value),  // Assicura che sia un numero
+                value: parsedValue,
                 date: latestReading.reading_date,
                 meter_id: meter.id
               };
 
-              console.log(`  ✅ Set previous for unit ${unit.id}:`, previous[unit.id]);
+              console.log(`  ✅ STORED in previous[${unit.id}]:`, previous[unit.id]);
             } else {
-              console.log(`  ⚠️ No readings found for meter ${meter.id}`);
+              console.log(`  ⚠️ No readings found for meter ${meter.id} (unit ${unit.number}, type ${activeTab})`);
             }
           } else {
-            console.log(`  ⚠️ No meter found for unit ${unit.number}, type ${activeTab}`);
+            console.log(`  ⚠️ No meter of type "${activeTab}" found for unit ${unit.number} (ID: ${unit.id})`);
+            if (meters && meters.length > 0) {
+              console.log(`  ℹ️ Available meter types for this unit:`, meters.map(m => m.type));
+            }
           }
         } catch (err) {
           console.error(`  ❌ Error loading readings for unit ${unit.id}:`, err);
         }
       }
 
-      console.log(`\n📦 FINAL previousReadings state:`, previous);
+      console.log(`\n📦 ========== FINAL previousReadings STATE ==========`);
+      console.log(`Total units with previous readings: ${Object.keys(previous).length}`);
+      Object.entries(previous).forEach(([unitId, data]) => {
+        console.log(`  Unit ${unitId}: value=${data.value}, date=${data.date}, meter_id=${data.meter_id}`);
+      });
+      console.log(`========================================\n`);
+
       setPreviousReadings(previous);
 
-      // Initialize new readings with today's date
+      // Initialize new readings with today's date - ALWAYS EMPTY VALUES
       const initialReadings = {};
       units.forEach(unit => {
         if (!unit.is_commercial || activeTab === 'cold_water') {
           initialReadings[unit.id] = {
-            value: '',
+            value: '',  // CRITICAL: Always start with empty string
             date: new Date().toISOString().split('T')[0]
           };
         }
       });
+
+      console.log(`📝 Initial readings state (all empty):`, initialReadings);
       setReadings(initialReadings);
 
-      console.log(`✅ === PREVIOUS READINGS LOADED ===\n`);
+      console.log(`✅ ========== PREVIOUS READINGS LOADED FOR ${activeTab} ==========\n`);
 
     } catch (error) {
       console.error('❌ Errore caricamento letture precedenti:', error);
@@ -221,50 +263,65 @@ function Readings() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      console.log(`\n💾 === SAVING READINGS ===`);
+      console.log(`\n💾 ===== SAVING READINGS FOR ${activeTab} =====`);
+      console.log(`📊 Current readings state:`, readings);
+      console.log(`📊 Current previousReadings state:`, previousReadings);
 
       const readingsToSave = [];
 
+      // CRITICAL: Itera SOLO sulle unità che hanno effettivamente un valore inserito
       for (const [unitId, reading] of Object.entries(readings)) {
-        if (reading.value !== '' && reading.value !== null && reading.value !== undefined && reading.date) {
+        // Verifica esplicita che ci sia un valore valido
+        const hasValue = reading.value !== '' && reading.value !== null && reading.value !== undefined;
+        const hasDate = reading.date && reading.date !== '';
+
+        console.log(`🔍 Unit ${unitId}: hasValue=${hasValue}, value="${reading.value}", hasDate=${hasDate}`);
+
+        if (hasValue && hasDate) {
           const readingData = {
             unit_id: parseInt(unitId),
-            meter_type: activeTab,
+            meter_type: activeTab,  // CRITICAL: usa sempre il tab attivo corrente
             meter_id: previousReadings[unitId]?.meter_id || null,
             reading_date: reading.date,
             value: parseFloat(reading.value),
             notes: null
           };
 
-          console.log(`  📝 Preparing reading for unit ${unitId}:`, readingData);
+          console.log(`  ✅ WILL SAVE for unit ${unitId}:`, readingData);
           readingsToSave.push(readingData);
+        } else {
+          console.log(`  ⏭️ SKIP unit ${unitId} - no value or no date`);
         }
       }
 
       if (readingsToSave.length === 0) {
         alert('Inserisci almeno una lettura');
+        setSaving(false);
         return;
       }
 
-      console.log(`  📤 Sending ${readingsToSave.length} readings to backend...`);
-      const response = await readingsAPI.createBatch(readingsToSave);
+      console.log(`\n📤 Sending ${readingsToSave.length} readings to backend for ${activeTab}:`);
+      console.log(JSON.stringify(readingsToSave, null, 2));
+
+      const response = await readingsAPI.createBatch({ readings: readingsToSave });
       console.log(`  ✅ Backend response:`, response.data);
 
       alert('Letture salvate con successo!');
 
-      // Aspetta un attimo per assicurare che il DB sia aggiornato
+      // Aspetta per assicurare che il DB sia aggiornato
       console.log(`  ⏳ Waiting for DB to update...`);
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Ricarica i dati
-      console.log(`  🔄 Reloading data...`);
+      // CRITICAL: Ricarica SOLO i dati per il tab corrente
+      console.log(`  🔄 Reloading data for ${activeTab}...`);
       await loadPreviousReadings();
       await loadHistoryReadings();
 
-      console.log(`✅ === SAVE COMPLETE ===\n`);
+      console.log(`✅ ===== SAVE COMPLETE FOR ${activeTab} =====\n`);
 
     } catch (error) {
       console.error('❌ Errore salvataggio letture:', error);
+      console.error('❌ Error details:', error.response?.data);
       alert('Errore durante il salvataggio delle letture: ' + (error.response?.data?.error || error.message));
     } finally {
       setSaving(false);
