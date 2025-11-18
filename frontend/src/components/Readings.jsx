@@ -120,12 +120,24 @@ function Readings() {
           const meter = meters?.[0];
 
           if (meter) {
-            // CRITICAL VALIDATION: Doppio check che il meter abbia il tipo corretto
+            // CRITICAL VALIDATION #1: Doppio check che il meter abbia il tipo corretto
             if (meter.type !== activeTab) {
               console.error(`  ❌ CRITICAL BUG: Meter returned has type "${meter.type}" but we requested "${activeTab}"!`);
               console.error(`  ❌ This should NEVER happen with backend filtering!`);
               alert(`⚠️ ERRORE CRITICO: Meter type mismatch! Meter type="${meter.type}", expected="${activeTab}"`);
               continue; // Skip this unit
+            }
+
+            // CRITICAL VALIDATION #2: VERIFY METER BELONGS TO THIS UNIT!
+            // This is THE most important fix to prevent cross-contamination!
+            if (meter.unit_id !== unit.id) {
+              console.error(`  ❌❌❌ CRITICAL BUG: METER BELONGS TO DIFFERENT UNIT!`);
+              console.error(`  ❌ Meter unit_id=${meter.unit_id}, but we are processing unit_id=${unit.id}!`);
+              console.error(`  ❌ Meter details:`, meter);
+              console.error(`  ❌ Unit details:`, { id: unit.id, number: unit.number, name: unit.name });
+              console.error(`  ❌ This means the backend SQL query returned the WRONG meter!`);
+              alert(`⚠️⚠️⚠️ CRITICAL DATABASE ERROR!\n\nMeter ${meter.id} (code: ${meter.meter_code}) belongs to unit ${meter.unit_id} but was returned when querying for unit ${unit.id} (${unit.number})!\n\nThis should NEVER happen! Check database integrity.`);
+              continue; // Skip this unit to prevent wrong data
             }
 
             console.log(`  ✅ Found meter ID ${meter.id} with correct type "${meter.type}":`, {
