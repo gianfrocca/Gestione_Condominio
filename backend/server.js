@@ -6,6 +6,8 @@ import { existsSync, mkdirSync } from 'fs';
 import { initDatabase } from './database.js';
 
 // Routes
+import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
 import unitsRouter from './routes/units.js';
 import readingsRouter from './routes/readings.js';
 import billsRouter from './routes/bills.js';
@@ -48,8 +50,10 @@ await initializeSampleData();
 app.get('/api', (req, res) => {
   res.json({
     message: 'API Gestione Condominio',
-    version: '1.0.0',
+    version: '2.0.0',
     endpoints: {
+      auth: '/api/auth',
+      users: '/api/users',
       units: '/api/units',
       readings: '/api/readings',
       bills: '/api/bills',
@@ -70,7 +74,11 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API Routes
+// API Routes - Auth routes DEVONO essere prima (non richiedono autenticazione)
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
+
+// Altre routes (protette da autenticazione - da aggiungere middleware nelle prossime fasi)
 app.use('/api/units', unitsRouter);
 app.use('/api/readings', readingsRouter);
 app.use('/api/bills', billsRouter);
