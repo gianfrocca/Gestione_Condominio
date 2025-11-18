@@ -3,10 +3,10 @@ import { allQuery, getQuery, runQuery } from '../database.js';
 
 const router = express.Router();
 
-// GET: Ottieni tutte le letture o filtrate per unità/tipo/mese
+// GET: Ottieni tutte le letture o filtrate per unità/tipo/mese/meter_id
 router.get('/', async (req, res) => {
   try {
-    const { unit_id, meter_type, month } = req.query;
+    const { unit_id, meter_type, month, meter_id } = req.query;
 
     let query = `
       SELECT r.*, m.type as meter_type, m.meter_code, u.number as unit_number, u.name as unit_name
@@ -16,6 +16,12 @@ router.get('/', async (req, res) => {
       WHERE 1=1
     `;
     const params = [];
+
+    // CRITICAL: Filter by meter_id if provided (most specific filter)
+    if (meter_id) {
+      query += ' AND r.meter_id = ?';
+      params.push(meter_id);
+    }
 
     if (unit_id) {
       query += ' AND u.id = ?';
