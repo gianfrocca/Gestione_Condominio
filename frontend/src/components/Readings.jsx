@@ -254,13 +254,28 @@ function Readings() {
   };
 
   const handleReadingChange = (unitId, field, value) => {
-    setReadings(prev => ({
-      ...prev,
-      [unitId]: {
-        ...prev[unitId],
-        [field]: value
-      }
-    }));
+    console.log(`\n🖊️ ===== handleReadingChange CALLED =====`);
+    console.log(`  Unit ID: ${unitId} (type: ${typeof unitId})`);
+    console.log(`  Field: ${field}`);
+    console.log(`  New Value: "${value}" (type: ${typeof value})`);
+
+    setReadings(prev => {
+      console.log(`  📋 Previous readings state:`, prev);
+
+      const newState = {
+        ...prev,
+        [unitId]: {
+          ...prev[unitId],
+          [field]: value
+        }
+      };
+
+      console.log(`  📝 New readings state:`, newState);
+      console.log(`  ✅ Updated ONLY unit ${unitId}, field "${field}" to "${value}"`);
+      console.log(`=========================================\n`);
+
+      return newState;
+    });
   };
 
   const calculateConsumption = (unitId) => {
