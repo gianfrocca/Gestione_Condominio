@@ -348,7 +348,24 @@ function Readings() {
 
       // NOTA: createBatch già wrappa in { readings: ... }, quindi passiamo solo l'array
       const response = await readingsAPI.createBatch(readingsToSave);
-      console.log(`  ✅ Backend response:`, response.data);
+      console.log(`\n📥 ===== BACKEND RESPONSE =====`);
+      console.log(`  Full response:`, response.data);
+      console.log(`  Inserted readings:`, response.data?.insertedReadings);
+
+      if (response.data?.insertedReadings) {
+        console.log(`  ⚠️⚠️⚠️ CRITICAL CHECK: Backend inserted ${response.data.insertedReadings.length} readings`);
+        console.log(`  We sent ${readingsToSave.length} readings`);
+
+        if (response.data.insertedReadings.length !== readingsToSave.length) {
+          console.error(`  ❌❌❌ BUG: Sent ${readingsToSave.length} but backend inserted ${response.data.insertedReadings.length}!`);
+        }
+
+        console.log(`  📊 Details of what was actually saved in database:`);
+        response.data.insertedReadings.forEach((r, idx) => {
+          console.log(`    ${idx + 1}. Reading ID ${r.id}: unit_id=${r.unit_id}, meter_type=${r.meter_type}, value=${r.value}, date=${r.reading_date}`);
+        });
+      }
+      console.log(`===============================\n`);
 
       alert('Letture salvate con successo!');
 
