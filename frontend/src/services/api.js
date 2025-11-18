@@ -9,6 +9,55 @@ const api = axios.create({
   },
 });
 
+// Interceptor per aggiungere automaticamente il token JWT alle richieste
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor per gestire errori di autenticazione
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Se errore 401 e non è già un retry, prova a refreshare il token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken) {
+          const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+            refreshToken
+          });
+
+          localStorage.setItem('accessToken', data.accessToken);
+          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh fallito, redirect al login
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 // Units API
 export const unitsAPI = {
   getAll: () => api.get('/units'),
@@ -80,6 +129,32 @@ export const paymentsAPI = {
   delete: (id) => api.delete(`/payments/${id}`),
   getSummary: (unitId) => api.get(`/payments/summary/${unitId}`),
   getSummaryAll: () => api.get('/payments/summary-all'),
+};
+
+// Auth API
+export const authAPI = {
+  login: (username, password) => axios.post(`${API_BASE_URL}/auth/login`, { username, password }),
+  logout: () => api.post('/auth/logout'),
+  refresh: (refreshToken) => axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }),
+  getMe: (token) => axios.get(`${API_BASE_URL}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` }
+  }),
+  changePassword: (token, currentPassword, newPassword) => axios.post(
+    `${API_BASE_URL}/auth/change-password`,
+    { currentPassword, newPassword },
+    { headers: { Authorization: `Bearer ${token}` } }
+  ),
+  resetPasswordRequest: (email) => axios.post(`${API_BASE_URL}/auth/reset-password-request`, { email }),
+};
+
+// Users API
+export const usersAPI = {
+  getAll: () => api.get('/users'),
+  getById: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  resetPassword: (id, newPassword) => api.post(`/users/${id}/reset-password`, { newPassword }),
 };
 
 // Health check
