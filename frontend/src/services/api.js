@@ -71,6 +71,17 @@ export const reportsAPI = {
   }),
 };
 
+// Payments API
+export const paymentsAPI = {
+  getAll: (params) => api.get('/payments', { params }),
+  getById: (id) => api.get(`/payments/${id}`),
+  create: (data) => api.post('/payments', data),
+  update: (id, data) => api.put(`/payments/${id}`, data),
+  delete: (id) => api.delete(`/payments/${id}`),
+  getSummary: (unitId) => api.get(`/payments/summary/${unitId}`),
+  getSummaryAll: () => api.get('/payments/summary-all'),
+};
+
 // Health check
 export const healthCheck = () => api.get('/health');
 

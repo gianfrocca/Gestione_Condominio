@@ -12,6 +12,7 @@ import billsRouter from './routes/bills.js';
 import calculationsRouter from './routes/calculations.js';
 import settingsRouter from './routes/settings.js';
 import reportsRouter from './routes/reports.js';
+import paymentsRouter from './routes/payments.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,7 +55,8 @@ app.get('/api', (req, res) => {
       bills: '/api/bills',
       calculations: '/api/calculations',
       settings: '/api/settings',
-      reports: '/api/reports'
+      reports: '/api/reports',
+      payments: '/api/payments'
     }
   });
 });
@@ -75,6 +77,7 @@ app.use('/api/bills', billsRouter);
 app.use('/api/calculations', calculationsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/payments', paymentsRouter);
 
 // Serve frontend statico (dopo le API routes)
 const frontendPath = join(__dirname, '../frontend/dist');

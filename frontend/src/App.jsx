@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
-import { Home, FileText, Settings as SettingsIcon, BarChart3, Menu, X } from 'lucide-react';
+import { Home, FileText, Settings as SettingsIcon, BarChart3, Menu, X, DollarSign } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Readings from './components/Readings';
 import Bills from './components/Bills';
 import Reports from './components/Reports';
+import Payments from './components/Payments';
 import Settings from './components/Settings';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
     { id: 'readings', name: 'Letture', icon: BarChart3 },
     { id: 'bills', name: 'Bollette', icon: FileText },
     { id: 'reports', name: 'Report', icon: FileText },
+    { id: 'payments', name: 'Pagamenti', icon: DollarSign },
     { id: 'settings', name: 'Impostazioni', icon: SettingsIcon },
   ];
 
@@ -29,6 +31,8 @@ function App() {
         return <Bills />;
       case 'reports':
         return <Reports />;
+      case 'payments':
+        return <Payments />;
       case 'settings':
         return <Settings />;
       default:

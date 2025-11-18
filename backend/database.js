@@ -56,10 +56,30 @@ export const initDatabase = async () => {
         surface_area REAL NOT NULL,
         is_inhabited BOOLEAN DEFAULT 1,
         is_commercial BOOLEAN DEFAULT 0,
+        foglio TEXT,
+        particella TEXT,
+        sub TEXT,
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Aggiungi colonne catastali se non esistono (per database esistenti)
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN foglio TEXT`);
+    } catch (e) {
+      // Colonna già esistente, ignora
+    }
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN particella TEXT`);
+    } catch (e) {
+      // Colonna già esistente, ignora
+    }
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN sub TEXT`);
+    } catch (e) {
+      // Colonna già esistente, ignora
+    }
 
     // Tabella Contabilizzatori
     await runQuery(`
@@ -144,6 +164,21 @@ export const initDatabase = async () => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (unit_id) REFERENCES units(id),
         UNIQUE(month, unit_id)
+      )
+    `);
+
+    // Tabella Pagamenti
+    await runQuery(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        unit_id INTEGER NOT NULL,
+        payment_date DATE NOT NULL,
+        amount REAL NOT NULL,
+        payment_type TEXT,
+        reference_month DATE,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (unit_id) REFERENCES units(id)
       )
     `);
 
