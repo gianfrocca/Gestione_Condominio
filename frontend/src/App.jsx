@@ -38,7 +38,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 lg:flex">
         {/* Mobile sidebar backdrop */}
         {sidebarOpen && (
           <div
@@ -49,7 +49,7 @@ function App() {
 
         {/* Sidebar */}
         <div
-          className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+          className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:relative lg:flex-shrink-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -95,7 +95,7 @@ function App() {
         </div>
 
         {/* Main content */}
-        <div className="lg:pl-64 flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-w-0">
           {/* Top bar */}
           <div className="sticky top-0 z-10 bg-white shadow-sm">
             <div className="flex items-center justify-between h-16 px-4 lg:px-8">
