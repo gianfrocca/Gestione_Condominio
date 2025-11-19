@@ -153,6 +153,18 @@ function splitGasCosts(totalGasCost, consumptions, settings) {
     .filter(u => !u.is_commercial)
     .reduce((sum, u) => sum + u.hot_water, 0);
 
+  // CRITICAL FIX: Se non ci sono consumi ACS, redistribuisci quota volontaria
+  let adjustedGasInvoluntaryCost = involuntaryCost;
+  let adjustedGasVoluntaryCost = voluntaryCost;
+
+  if (totalHotWaterConsumption === 0 && voluntaryCost > 0) {
+    console.log(`⚠️ Zero gas hot water consumption. Redistributing €${voluntaryCost.toFixed(2)} to fixed quota`);
+    adjustedGasInvoluntaryCost = involuntaryCost + voluntaryCost;
+    adjustedGasVoluntaryCost = 0;
+  }
+
+  console.log(`💡 Gas - Involuntary: €${adjustedGasInvoluntaryCost.toFixed(2)}, Voluntary: €${adjustedGasVoluntaryCost.toFixed(2)}`);
+
   const results = {};
 
   for (const unit of consumptions) {
@@ -164,13 +176,13 @@ function splitGasCosts(totalGasCost, consumptions, settings) {
     // Quota involontaria: solo se abitato
     let unitInvoluntary = 0;
     if (unit.is_inhabited && totalInhabitedSurface > 0) {
-      unitInvoluntary = (involuntaryCost * unit.surface_area) / totalInhabitedSurface;
+      unitInvoluntary = (adjustedGasInvoluntaryCost * unit.surface_area) / totalInhabitedSurface;
     }
 
-    // Quota volontaria: proporzionale ai consumi ACS
+    // Quota volontaria: proporzionale ai consumi ACS (solo se ci sono consumi)
     let unitVoluntary = 0;
-    if (totalHotWaterConsumption > 0) {
-      unitVoluntary = (voluntaryCost * unit.hot_water) / totalHotWaterConsumption;
+    if (totalHotWaterConsumption > 0 && adjustedGasVoluntaryCost > 0) {
+      unitVoluntary = (adjustedGasVoluntaryCost * unit.hot_water) / totalHotWaterConsumption;
     }
 
     // Il metano va principalmente per ACS (acqua calda sanitaria)
@@ -256,14 +268,39 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
   const hotWaterCost = voluntaryCost * hotWaterPct;
   const coldWaterCost = voluntaryCost * coldWaterPct;
 
+  // CRITICAL FIX: Se una categoria ha ZERO consumi totali, quella quota
+  // deve essere ripartita comunque (altrimenti si perde denaro!)
+  // Strategia: aggiungerla alla quota involontaria (ripartita per superficie)
+  let redistributedCost = 0;
+
+  if (totalHeating === 0 && heatingPct > 0) {
+    console.log(`⚠️ Zero heating consumption. Redistributing €${heatingCost.toFixed(2)} to fixed quota`);
+    redistributedCost += heatingCost;
+  }
+
+  if (totalHotWater === 0 && hotWaterPct > 0) {
+    console.log(`⚠️ Zero hot water consumption. Redistributing €${hotWaterCost.toFixed(2)} to fixed quota`);
+    redistributedCost += hotWaterCost;
+  }
+
+  if (totalColdWater === 0 && coldWaterPct > 0) {
+    console.log(`⚠️ Zero cold water consumption. Redistributing €${coldWaterCost.toFixed(2)} to fixed quota`);
+    redistributedCost += coldWaterCost;
+  }
+
+  // Aggiungi quota redistribuita alla involontaria
+  const adjustedInvoluntaryCost = involuntaryCost + redistributedCost;
+
+  console.log(`💡 Involuntary cost: €${involuntaryCost.toFixed(2)} + redistributed: €${redistributedCost.toFixed(2)} = €${adjustedInvoluntaryCost.toFixed(2)}`);
+
   const results = {};
 
   for (const unit of consumptions) {
-    // Quota involontaria (base superficie)
+    // Quota involontaria (base superficie) + quota redistribuita
     const surfaceWeight = unit.is_inhabited ? 1 : uninhabitedWeight;
     const weightedSurface = unit.surface_area * surfaceWeight;
     const unitInvoluntary = totalSurface > 0
-      ? (involuntaryCost * weightedSurface) / totalSurface
+      ? (adjustedInvoluntaryCost * weightedSurface) / totalSurface
       : 0;
 
     // Quota volontaria riscaldamento (solo residenziali)

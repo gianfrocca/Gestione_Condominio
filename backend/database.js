@@ -318,7 +318,8 @@ export const initDatabase = async () => {
       ['winter_hot_water_pct', '25', 'Percentuale ACS inverno'],
       ['winter_cold_water_pct', '10', 'Percentuale ACF inverno'],
       ['staircase_lights_cost', '2', 'Costo forfettario luci scale (€/mese)'],
-      ['commercial_water_fixed', '5', 'Quota fissa commerciale acqua (€/mese)']
+      ['commercial_water_fixed', '5', 'Quota fissa commerciale acqua (€/mese)'],
+      ['uninhabited_weight', '0.3', 'Peso unità non abitate (0-1, es. 0.3 = 30%)']
     ];
 
     for (const [key, value, description] of defaultSettings) {
