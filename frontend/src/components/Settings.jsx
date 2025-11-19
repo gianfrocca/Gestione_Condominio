@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Settings as SettingsIcon, Building2, Calendar, Sliders, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Save, Settings as SettingsIcon, Building2, Calendar, Sliders, DollarSign, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { settingsAPI, unitsAPI } from '../services/api';
 
 function Settings() {
@@ -102,6 +102,8 @@ function Settings() {
       surface_area: '',
       is_inhabited: true,
       is_commercial: false,
+      monthly_elec_fixed: 0,
+      monthly_gas_fixed: 0,
       foglio: '',
       particella: '',
       sub: '',
@@ -134,6 +136,7 @@ function Settings() {
   const tabs = [
     { id: 'parametri', name: 'Parametri Consumi', icon: Sliders },
     { id: 'stagionalita', name: 'Stagionalità', icon: Calendar },
+    { id: 'forfettari', name: 'Costi Forfettari', icon: DollarSign },
     { id: 'unita', name: 'Unità Immobiliari', icon: Building2 },
   ];
 
@@ -154,7 +157,7 @@ function Settings() {
             Configura parametri di calcolo, stagionalità e unità immobiliari
           </p>
         </div>
-        {activeTab !== 'unita' && (
+        {activeTab !== 'unita' && activeTab !== 'forfettari' && (
           <button
             onClick={handleSaveSettings}
             disabled={saving}
@@ -162,6 +165,16 @@ function Settings() {
           >
             <Save className="h-5 w-5" />
             <span>{saving ? 'Salvataggio...' : 'Salva Impostazioni'}</span>
+          </button>
+        )}
+        {activeTab === 'forfettari' && (
+          <button
+            onClick={handleSaveSettings}
+            disabled={saving}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Save className="h-5 w-5" />
+            <span>{saving ? 'Salvataggio...' : 'Salva Costi Forfettari'}</span>
           </button>
         )}
       </div>
@@ -249,37 +262,6 @@ function Settings() {
                   type="number"
                   value={getSetting('elec_voluntary_pct')?.value || ''}
                   onChange={(e) => handleSettingChange('elec_voluntary_pct', e.target.value)}
-                  className="input"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Fixed Costs */}
-          <div className="card">
-            <h2 className="text-xl font-semibold mb-4">Costi Fissi</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Luci Scale (€/mese)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={getSetting('staircase_lights_cost')?.value || ''}
-                  onChange={(e) => handleSettingChange('staircase_lights_cost', e.target.value)}
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Quota Fissa Commerciale Acqua (€/mese)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={getSetting('commercial_water_fixed')?.value || ''}
-                  onChange={(e) => handleSettingChange('commercial_water_fixed', e.target.value)}
                   className="input"
                 />
               </div>
@@ -405,6 +387,67 @@ function Settings() {
         </div>
       )}
 
+      {activeTab === 'forfettari' && (
+        <div className="space-y-6">
+          {/* Fixed Costs */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <DollarSign className="h-5 w-5 mr-2" />
+              Costi Forfettari Generali
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Questi costi vengono applicati a specifiche unità o situazioni
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Luci Scale (€/mese)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={getSetting('staircase_lights_cost')?.value || ''}
+                  onChange={(e) => handleSettingChange('staircase_lights_cost', e.target.value)}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Costo mensile forfettario per illuminazione parti comuni
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quota Fissa Commerciale Acqua (€/mese)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={getSetting('commercial_water_fixed')?.value || ''}
+                  onChange={(e) => handleSettingChange('commercial_water_fixed', e.target.value)}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Quota fissa mensile per unità commerciali
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Info about unit-specific forfaits */}
+          <div className="card bg-blue-50 border border-blue-200">
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">ℹ️ Forfettari per Unità Non Abitate</h3>
+            <p className="text-sm text-blue-800">
+              Per impostare forfettari mensili di elettricità e gas per unità non abitate:
+            </p>
+            <ol className="list-decimal list-inside text-sm text-blue-800 mt-2 space-y-1">
+              <li>Vai alla scheda <strong>"Unità Immobiliari"</strong></li>
+              <li>Modifica un'unità e imposta <strong>"Abitato = No"</strong></li>
+              <li>Inserisci i valori nei campi <strong>"Forfait Luce (€/mese)"</strong> e <strong>"Forfait Gas (€/mese)"</strong></li>
+              <li>Quelle unità pagheranno SOLO il forfettario e NON parteciperanno alla ripartizione</li>
+            </ol>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'unita' && (
         <div className="space-y-6">
           <div className="card">
@@ -429,6 +472,8 @@ function Settings() {
                     <th>Superficie (mq)</th>
                     <th>Abitato</th>
                     <th>Commerciale</th>
+                    <th>Forfait Luce (€/mese)</th>
+                    <th>Forfait Gas (€/mese)</th>
                     <th>Foglio</th>
                     <th>Particella</th>
                     <th>Sub</th>
@@ -481,6 +526,34 @@ function Settings() {
                           onChange={(e) => setNewUnit({ ...newUnit, is_commercial: e.target.checked })}
                           className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                         />
+                      </td>
+                      <td>
+                        {!newUnit.is_inhabited ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={newUnit.monthly_elec_fixed || 0}
+                            onChange={(e) => setNewUnit({ ...newUnit, monthly_elec_fixed: parseFloat(e.target.value) || 0 })}
+                            placeholder="0.00"
+                            className="input input-sm w-20"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
+                      </td>
+                      <td>
+                        {!newUnit.is_inhabited ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={newUnit.monthly_gas_fixed || 0}
+                            onChange={(e) => setNewUnit({ ...newUnit, monthly_gas_fixed: parseFloat(e.target.value) || 0 })}
+                            placeholder="0.00"
+                            className="input input-sm w-20"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
                       </td>
                       <td>
                         <input
@@ -575,6 +648,32 @@ function Settings() {
                           />
                         </td>
                         <td>
+                          {!editingUnit.is_inhabited ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingUnit.monthly_elec_fixed || 0}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_elec_fixed: parseFloat(e.target.value) || 0 })}
+                              className="input input-sm w-20"
+                            />
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </td>
+                        <td>
+                          {!editingUnit.is_inhabited ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingUnit.monthly_gas_fixed || 0}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_gas_fixed: parseFloat(e.target.value) || 0 })}
+                              className="input input-sm w-20"
+                            />
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </td>
+                        <td>
                           <input
                             type="text"
                             value={editingUnit.foglio || ''}
@@ -631,6 +730,12 @@ function Settings() {
                           <span className={`badge ${unit.is_commercial ? 'badge-blue' : 'badge-gray'}`}>
                             {unit.is_commercial ? 'Sì' : 'No'}
                           </span>
+                        </td>
+                        <td className={!unit.is_inhabited ? 'font-medium' : 'text-gray-400'}>
+                          {!unit.is_inhabited ? `€${(unit.monthly_elec_fixed || 0).toFixed(2)}` : '-'}
+                        </td>
+                        <td className={!unit.is_inhabited ? 'font-medium' : 'text-gray-400'}>
+                          {!unit.is_inhabited ? `€${(unit.monthly_gas_fixed || 0).toFixed(2)}` : '-'}
                         </td>
                         <td className="text-gray-600">{unit.foglio || '-'}</td>
                         <td className="text-gray-600">{unit.particella || '-'}</td>
