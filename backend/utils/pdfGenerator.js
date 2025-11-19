@@ -169,11 +169,93 @@ export async function generateMonthlyReport(data, outputPath) {
         doc.moveDown(1);
       }
 
+      // TABELLA RIEPILOGO FINALE
+      if (doc.y > 600) {
+        doc.addPage();
+      }
+
+      doc.fontSize(14).font('Helvetica-Bold').text('TABELLA RIEPILOGO', { align: 'center' });
+      doc.moveDown(1);
+
+      // Header tabella
+      doc.fontSize(10).font('Helvetica-Bold');
+      const tableTop = doc.y;
+      const col1 = 50;
+      const col2 = 250;
+      const col3 = 450;
+
+      doc.text('Unità', col1, tableTop);
+      doc.text('Nome', col2, tableTop);
+      doc.text('Totale', col3, tableTop, { align: 'right' });
+      doc.moveDown(0.5);
+
+      // Linea sotto header
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      doc.moveDown(0.3);
+
+      // Righe
+      doc.fontSize(9).font('Helvetica');
+      let sumUnits = 0;
+
+      for (const unit of data.units) {
+        const y = doc.y;
+        doc.text(unit.unit_number, col1, y);
+        doc.text(unit.unit_name, col2, y);
+        doc.text(`€${unit.costs.total.toFixed(2)}`, col3, y, { align: 'right' });
+        sumUnits += unit.costs.total;
+        doc.moveDown(0.5);
+
+        // Nuova pagina se necessario
+        if (doc.y > 700) {
+          doc.addPage();
+          doc.moveDown(1);
+        }
+      }
+
+      // Linea prima del totale
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      doc.moveDown(0.5);
+
+      // Totale unità
+      doc.fontSize(10).font('Helvetica-Bold');
+      const totalY = doc.y;
+      doc.text('SOMMA UNITÀ:', col1, totalY);
+      doc.text(`€${sumUnits.toFixed(2)}`, col3, totalY, { align: 'right' });
+      doc.moveDown(0.8);
+
+      // Totale bollette
+      const billTotal = data.total_gas_cost + data.total_elec_cost;
+      const billY = doc.y;
+      doc.text('TOTALE BOLLETTE:', col1, billY);
+      doc.text(`€${billTotal.toFixed(2)}`, col3, billY, { align: 'right' });
+      doc.moveDown(0.8);
+
+      // Differenza (dovrebbe essere 0)
+      const diff = Math.abs(sumUnits - billTotal);
+      const diffY = doc.y;
+      if (diff < 0.02) {
+        doc.fillColor('#10b981'); // Verde se OK
+        doc.text('VERIFICA:', col1, diffY);
+        doc.text('✓ OK', col3, diffY, { align: 'right' });
+      } else {
+        doc.fillColor('#ef4444'); // Rosso se problema
+        doc.text('DIFFERENZA:', col1, diffY);
+        doc.text(`€${diff.toFixed(2)}`, col3, diffY, { align: 'right' });
+      }
+      doc.fillColor('black');
+      doc.moveDown(1);
+
+      // Nota verifica
+      doc.fontSize(8).font('Helvetica').fillColor('#666');
+      doc.text('La somma delle unità deve corrispondere al totale delle bollette del periodo.', { align: 'center' });
+      doc.fillColor('black');
+      doc.moveDown(2);
+
       // Footer
       doc.fontSize(8).text(
         `Report generato il ${new Date().toLocaleDateString('it-IT')} alle ${new Date().toLocaleTimeString('it-IT')}`,
         50,
-        750,
+        doc.y,
         { align: 'center' }
       );
 

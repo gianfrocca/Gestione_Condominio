@@ -65,41 +65,64 @@ async function calculateConsumptions(dateFrom, dateTo) {
     }
 
     if (unit.meter_id) {
-      // Lettura finale: la più recente <= dateTo
-      const endReading = await getQuery(
-        `SELECT value, reading_date FROM readings
-         WHERE meter_id = ? AND reading_date <= ?
-         ORDER BY reading_date DESC LIMIT 1`,
-        [unit.meter_id, dateTo]
-      );
-
-      // Lettura iniziale: la più recente <= dateFrom
-      // Se non c'è lettura esattamente a dateFrom, prende l'ultima disponibile prima
+      // CRITICAL FIX: Lettura INIZIALE deve essere PRIMA del periodo (< dateFrom)
+      // Altrimenti se non ci sono letture prima, prende una lettura NEL periodo
+      // risultando in startReading = endReading → consumption = 0
       const startReading = await getQuery(
         `SELECT value, reading_date FROM readings
-         WHERE meter_id = ? AND reading_date <= ?
+         WHERE meter_id = ? AND reading_date < ?
          ORDER BY reading_date DESC LIMIT 1`,
         [unit.meter_id, dateFrom]
       );
 
-      if (endReading && startReading) {
-        const consumption = endReading.value - startReading.value;
+      // Lettura FINALE: la più recente NEL periodo (tra dateFrom e dateTo)
+      // Oppure, se non ci sono letture nel periodo, prende l'ultima disponibile <= dateTo
+      const endReading = await getQuery(
+        `SELECT value, reading_date FROM readings
+         WHERE meter_id = ? AND reading_date >= ? AND reading_date <= ?
+         ORDER BY reading_date DESC LIMIT 1`,
+        [unit.meter_id, dateFrom, dateTo]
+      );
 
-        console.log(`  📊 Meter ${unit.meter_id} (${unit.meter_type}): ${startReading.value} (${startReading.reading_date}) → ${endReading.value} (${endReading.reading_date}) = ${consumption}`);
+      // Fallback: se non ci sono letture NEL periodo, prova l'ultima <= dateTo
+      let finalEndReading = endReading;
+      if (!finalEndReading) {
+        finalEndReading = await getQuery(
+          `SELECT value, reading_date FROM readings
+           WHERE meter_id = ? AND reading_date <= ?
+           ORDER BY reading_date DESC LIMIT 1`,
+          [unit.meter_id, dateTo]
+        );
+      }
+
+      if (finalEndReading && startReading) {
+        const consumption = finalEndReading.value - startReading.value;
+
+        console.log(`  📊 Meter ${unit.meter_id} (${unit.meter_type}):`);
+        console.log(`     Start: ${startReading.value} (${startReading.reading_date}) [BEFORE period]`);
+        console.log(`     End:   ${finalEndReading.value} (${finalEndReading.reading_date}) [IN/AT period]`);
+        console.log(`     ➡️ Consumption: ${consumption}`);
+
+        if (consumption < 0) {
+          console.error(`  ⚠️ NEGATIVE consumption detected! This should not happen.`);
+          console.error(`  Possible counter reset or data error.`);
+        }
 
         switch (unit.meter_type) {
           case 'heating':
-            consumptions[unit.id].heating = consumption;
+            consumptions[unit.id].heating = Math.max(0, consumption); // Prevent negative
             break;
           case 'hot_water':
-            consumptions[unit.id].hot_water = consumption;
+            consumptions[unit.id].hot_water = Math.max(0, consumption);
             break;
           case 'cold_water':
-            consumptions[unit.id].cold_water = consumption;
+            consumptions[unit.id].cold_water = Math.max(0, consumption);
             break;
         }
       } else {
-        console.log(`  ⚠️ Meter ${unit.meter_id} (${unit.meter_type}): Missing readings (start: ${!!startReading}, end: ${!!endReading})`);
+        console.log(`  ⚠️ Meter ${unit.meter_id} (${unit.meter_type}): Missing readings`);
+        console.log(`     - Start reading (< ${dateFrom}): ${!!startReading}`);
+        console.log(`     - End reading (<= ${dateTo}): ${!!finalEndReading}`);
       }
     }
   }
@@ -206,10 +229,13 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
   // Sottrai i costi fissi dalla quota involontaria
   involuntaryCost -= totalFixedCosts;
 
+  // Peso per unità non abitate (da settings, default 0.3 = 30%)
+  const uninhabitedWeight = parseFloat(settings.uninhabited_weight || '0.3');
+
   // Calcola totali per ripartizioni proporzionali
   const totalSurface = consumptions.reduce((sum, u) => {
-    // Se non abitato, partecipa con peso ridotto (es. 30%)
-    const weight = u.is_inhabited ? 1 : 0.3;
+    // Se non abitato, partecipa con peso ridotto
+    const weight = u.is_inhabited ? 1 : uninhabitedWeight;
     return sum + (u.surface_area * weight);
   }, 0);
 
@@ -234,7 +260,7 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
 
   for (const unit of consumptions) {
     // Quota involontaria (base superficie)
-    const surfaceWeight = unit.is_inhabited ? 1 : 0.3;
+    const surfaceWeight = unit.is_inhabited ? 1 : uninhabitedWeight;
     const weightedSurface = unit.surface_area * surfaceWeight;
     const unitInvoluntary = totalSurface > 0
       ? (involuntaryCost * weightedSurface) / totalSurface
@@ -400,6 +426,26 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
       });
     }
 
+    // CRITICAL VERIFICATION: Somma unità DEVE essere uguale a somma bollette
+    const sumUnitsTotal = results.reduce((sum, unit) => sum + unit.costs.total, 0);
+    const expectedTotal = totalGasCost + totalElecCost;
+    const difference = Math.abs(sumUnitsTotal - expectedTotal);
+    const tolerance = 0.02; // Tolleranza 2 centesimi per arrotondamenti
+
+    console.log(`\n🔍 ========== VERIFICATION ==========`);
+    console.log(`💰 Total bills: €${expectedTotal.toFixed(2)}`);
+    console.log(`📊 Sum of units: €${sumUnitsTotal.toFixed(2)}`);
+    console.log(`🔢 Difference: €${difference.toFixed(4)}`);
+
+    if (difference > tolerance) {
+      console.error(`\n❌❌❌ CRITICAL ERROR: MONEY LOST/GAINED!`);
+      console.error(`Expected: €${expectedTotal.toFixed(2)}`);
+      console.error(`Calculated: €${sumUnitsTotal.toFixed(2)}`);
+      console.error(`Difference: €${difference.toFixed(2)}`);
+      throw new Error(`Verifica fallita: la somma delle unità (€${sumUnitsTotal.toFixed(2)}) non corrisponde al totale bollette (€${expectedTotal.toFixed(2)}). Differenza: €${difference.toFixed(2)}`);
+    }
+
+    console.log(`✅ Verification passed! Difference within tolerance.`);
     console.log(`✅ ========== CALCULATION COMPLETE ==========\n`);
 
     return {
@@ -411,7 +457,13 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
       total_gas_cost: totalGasCost,
       total_elec_cost: totalElecCost,
       total_cost: totalGasCost + totalElecCost,
-      units: results
+      units: results,
+      verification: {
+        expected_total: expectedTotal,
+        calculated_total: sumUnitsTotal,
+        difference: difference,
+        passed: difference <= tolerance
+      }
     };
   } catch (error) {
     console.error('Errore calcolo ripartizione:', error);
