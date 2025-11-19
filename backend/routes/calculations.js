@@ -4,23 +4,35 @@ import { allQuery, runQuery } from '../database.js';
 
 const router = express.Router();
 
-// POST: Calcola ripartizione per un mese
+// POST: Calcola ripartizione per un periodo personalizzato
 router.post('/calculate', async (req, res) => {
   try {
-    const { month } = req.body;
+    const { dateFrom, dateTo, type = 'both' } = req.body;
 
-    if (!month) {
-      return res.status(400).json({ error: 'Parametro month richiesto (formato: YYYY-MM)' });
+    // Validazione parametri
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({ error: 'Parametri dateFrom e dateTo richiesti (formato: YYYY-MM-DD)' });
     }
 
-    // Valida formato mese
-    if (!/^\d{4}-\d{2}$/.test(month)) {
-      return res.status(400).json({ error: 'Formato mese non valido. Usa YYYY-MM' });
+    // Valida formato date
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateFrom) || !dateRegex.test(dateTo)) {
+      return res.status(400).json({ error: 'Formato date non valido. Usa YYYY-MM-DD' });
     }
 
-    const result = await calculateMonthlySplit(month);
+    // Valida che dateFrom <= dateTo
+    if (new Date(dateFrom) > new Date(dateTo)) {
+      return res.status(400).json({ error: 'La data iniziale deve essere precedente o uguale alla data finale' });
+    }
 
-    // Salva nel database lo storico
+    // Valida type
+    if (!['gas', 'electricity', 'both'].includes(type)) {
+      return res.status(400).json({ error: 'Parametro type deve essere: gas, electricity o both' });
+    }
+
+    const result = await calculateMonthlySplit(dateFrom, dateTo, type);
+
+    // Salva nel database lo storico (usa data inizio come riferimento)
     for (const unit of result.units) {
       await runQuery(
         `INSERT OR REPLACE INTO monthly_splits
@@ -28,7 +40,7 @@ router.post('/calculate', async (req, res) => {
           cost_elec_hot_water, cost_elec_cooling, cost_elec_cold_water, cost_elec_fixed, total_cost)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          month + '-01',
+          dateFrom,
           unit.unit_id,
           unit.costs.gas_heating,
           unit.costs.gas_hot_water,

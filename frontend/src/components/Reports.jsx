@@ -4,7 +4,13 @@ import { calculationsAPI, reportsAPI } from '../services/api';
 import { format } from 'date-fns';
 
 function Reports() {
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const today = new Date();
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  const [dateFrom, setDateFrom] = useState(format(firstDayOfMonth, 'yyyy-MM-dd'));
+  const [dateTo, setDateTo] = useState(format(lastDayOfMonth, 'yyyy-MM-dd'));
+  const [calculationType, setCalculationType] = useState('both'); // 'gas', 'electricity', 'both'
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [calculating, setCalculating] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
@@ -13,7 +19,7 @@ function Reports() {
   const handleCalculate = async () => {
     try {
       setCalculating(true);
-      const { data } = await calculationsAPI.calculate(selectedMonth);
+      const { data } = await calculationsAPI.calculate(dateFrom, dateTo, calculationType);
       setCalculationResult(data);
       alert('Calcolo completato con successo!');
     } catch (error) {
@@ -27,13 +33,14 @@ function Reports() {
   const handleGenerateMonthlyPDF = async () => {
     try {
       setGeneratingPDF(true);
-      const response = await reportsAPI.generateMonthly(selectedMonth);
+      const response = await reportsAPI.generateMonthly(dateFrom, dateTo, calculationType);
 
       // Download del PDF
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `report-${selectedMonth}.pdf`);
+      const filename = `report-${dateFrom}_${dateTo}_${calculationType}.pdf`;
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -78,20 +85,79 @@ function Reports() {
         </p>
       </div>
 
-      {/* Monthly Report */}
+      {/* Period Report */}
       <div className="card">
-        <h2 className="text-xl font-semibold mb-4">Report Mensile</h2>
+        <h2 className="text-xl font-semibold mb-4">Report Periodo</h2>
         <div className="space-y-4">
+          {/* Date Range */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data Inizio Periodo
+              </label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="input max-w-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data Fine Periodo
+              </label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="input max-w-xs"
+              />
+            </div>
+          </div>
+
+          {/* Calculation Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Seleziona Mese
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Tipo Calcolo
             </label>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="input max-w-xs"
-            />
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="both"
+                  checked={calculationType === 'both'}
+                  onChange={(e) => setCalculationType(e.target.value)}
+                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  🔄 Metano + Energia Elettrica
+                </span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="gas"
+                  checked={calculationType === 'gas'}
+                  onChange={(e) => setCalculationType(e.target.value)}
+                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  🔥 Solo Metano
+                </span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="electricity"
+                  checked={calculationType === 'electricity'}
+                  onChange={(e) => setCalculationType(e.target.value)}
+                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  ⚡ Solo Energia Elettrica
+                </span>
+              </label>
+            </div>
           </div>
 
           <div className="flex space-x-3">

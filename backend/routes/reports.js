@@ -17,20 +17,20 @@ if (!existsSync(reportsDir)) {
   mkdirSync(reportsDir, { recursive: true });
 }
 
-// POST: Genera report mensile PDF
+// POST: Genera report periodo PDF
 router.post('/monthly', async (req, res) => {
   try {
-    const { month } = req.body;
+    const { dateFrom, dateTo, type = 'both' } = req.body;
 
-    if (!month) {
-      return res.status(400).json({ error: 'Parametro month richiesto (formato: YYYY-MM)' });
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({ error: 'Parametri dateFrom e dateTo richiesti (formato: YYYY-MM-DD)' });
     }
 
     // Calcola ripartizione
-    const data = await calculateMonthlySplit(month);
+    const data = await calculateMonthlySplit(dateFrom, dateTo, type);
 
     // Genera PDF
-    const filename = `report-${month}.pdf`;
+    const filename = `report-${dateFrom}_${dateTo}_${type}.pdf`;
     const outputPath = join(reportsDir, filename);
 
     await generateMonthlyReport(data, outputPath);

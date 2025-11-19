@@ -32,17 +32,13 @@ function getSeason(month, settings) {
 }
 
 /**
- * Calcola i consumi per unità e tipo
- * @param {string} month - Mese nel formato 'YYYY-MM'
+ * Calcola i consumi per unità e tipo in un periodo personalizzato
+ * @param {string} dateFrom - Data inizio periodo (YYYY-MM-DD)
+ * @param {string} dateTo - Data fine periodo (YYYY-MM-DD)
  * @returns {Promise<object>} Consumi per unità
  */
-async function calculateConsumptions(month) {
-  const [year, monthNum] = month.split('-').map(Number);
-  const currentDate = new Date(year, monthNum - 1, 1);
-  const previousDate = new Date(year, monthNum - 2, 1);
-
-  const currentMonth = currentDate.toISOString().slice(0, 7);
-  const previousMonth = previousDate.toISOString().slice(0, 7);
+async function calculateConsumptions(dateFrom, dateTo) {
+  console.log(`\n🧮 Calculating consumptions for period: ${dateFrom} to ${dateTo}`);
 
   // Ottieni tutte le unità con i loro contabilizzatori
   const units = await allQuery(`
@@ -69,24 +65,27 @@ async function calculateConsumptions(month) {
     }
 
     if (unit.meter_id) {
-      // Lettura mese corrente
-      const currentReading = await getQuery(
-        `SELECT value FROM readings
-         WHERE meter_id = ? AND strftime('%Y-%m', reading_date) = ?
+      // Lettura finale: la più recente <= dateTo
+      const endReading = await getQuery(
+        `SELECT value, reading_date FROM readings
+         WHERE meter_id = ? AND reading_date <= ?
          ORDER BY reading_date DESC LIMIT 1`,
-        [unit.meter_id, currentMonth]
+        [unit.meter_id, dateTo]
       );
 
-      // Lettura mese precedente
-      const previousReading = await getQuery(
-        `SELECT value FROM readings
-         WHERE meter_id = ? AND strftime('%Y-%m', reading_date) = ?
+      // Lettura iniziale: la più recente <= dateFrom
+      // Se non c'è lettura esattamente a dateFrom, prende l'ultima disponibile prima
+      const startReading = await getQuery(
+        `SELECT value, reading_date FROM readings
+         WHERE meter_id = ? AND reading_date <= ?
          ORDER BY reading_date DESC LIMIT 1`,
-        [unit.meter_id, previousMonth]
+        [unit.meter_id, dateFrom]
       );
 
-      if (currentReading && previousReading) {
-        const consumption = currentReading.value - previousReading.value;
+      if (endReading && startReading) {
+        const consumption = endReading.value - startReading.value;
+
+        console.log(`  📊 Meter ${unit.meter_id} (${unit.meter_type}): ${startReading.value} (${startReading.reading_date}) → ${endReading.value} (${endReading.reading_date}) = ${consumption}`);
 
         switch (unit.meter_type) {
           case 'heating':
@@ -99,6 +98,8 @@ async function calculateConsumptions(month) {
             consumptions[unit.id].cold_water = consumption;
             break;
         }
+      } else {
+        console.log(`  ⚠️ Meter ${unit.meter_id} (${unit.meter_type}): Missing readings (start: ${!!startReading}, end: ${!!endReading})`);
       }
     }
   }
@@ -282,12 +283,18 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
 }
 
 /**
- * Calcola la ripartizione completa per un mese
- * @param {string} month - Mese nel formato 'YYYY-MM'
+ * Calcola la ripartizione completa per un periodo personalizzato
+ * @param {string} dateFrom - Data inizio periodo (YYYY-MM-DD)
+ * @param {string} dateTo - Data fine periodo (YYYY-MM-DD)
+ * @param {string} type - Tipo calcolo: 'gas', 'electricity', 'both' (default: 'both')
  * @returns {Promise<object>} Ripartizione completa
  */
-export async function calculateMonthlySplit(month) {
+export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
   try {
+    console.log(`\n💰 ========== CALCULATION STARTED ==========`);
+    console.log(`📅 Period: ${dateFrom} to ${dateTo}`);
+    console.log(`📊 Type: ${type}`);
+
     // Carica impostazioni
     const settingsRows = await allQuery('SELECT key, value FROM settings');
     const settings = {};
@@ -295,36 +302,68 @@ export async function calculateMonthlySplit(month) {
       settings[row.key] = row.value;
     });
 
-    // Ottieni bollette del mese
-    const gasBill = await getQuery(
-      `SELECT amount FROM bills
-       WHERE type = 'gas' AND strftime('%Y-%m', bill_date) = ?
-       ORDER BY bill_date DESC LIMIT 1`,
-      [month]
-    );
+    // Determina quale mese usare per stagionalità (usa il mese centrale del periodo)
+    const startDate = new Date(dateFrom);
+    const endDate = new Date(dateTo);
+    const midDate = new Date((startDate.getTime() + endDate.getTime()) / 2);
+    const monthNum = midDate.getMonth() + 1; // 1-12
 
-    const elecBill = await getQuery(
-      `SELECT amount FROM bills
-       WHERE type = 'electricity' AND strftime('%Y-%m', bill_date) = ?
-       ORDER BY bill_date DESC LIMIT 1`,
-      [month]
-    );
+    console.log(`🌡️ Season calculation based on month: ${monthNum}`);
 
-    if (!gasBill || !elecBill) {
-      throw new Error('Bollette non trovate per il mese specificato');
+    // Somma bollette nel periodo (per tipo)
+    let totalGasCost = 0;
+    let totalElecCost = 0;
+
+    if (type === 'gas' || type === 'both') {
+      const gasBills = await allQuery(
+        `SELECT SUM(amount) as total FROM bills
+         WHERE type = 'gas' AND bill_date >= ? AND bill_date <= ?`,
+        [dateFrom, dateTo]
+      );
+      totalGasCost = gasBills[0]?.total || 0;
+      console.log(`🔥 Total gas bills in period: €${totalGasCost.toFixed(2)}`);
+
+      if (totalGasCost === 0 && type === 'gas') {
+        throw new Error('Nessuna bolletta gas trovata nel periodo specificato');
+      }
+    }
+
+    if (type === 'electricity' || type === 'both') {
+      const elecBills = await allQuery(
+        `SELECT SUM(amount) as total FROM bills
+         WHERE type = 'electricity' AND bill_date >= ? AND bill_date <= ?`,
+        [dateFrom, dateTo]
+      );
+      totalElecCost = elecBills[0]?.total || 0;
+      console.log(`⚡ Total electricity bills in period: €${totalElecCost.toFixed(2)}`);
+
+      if (totalElecCost === 0 && type === 'electricity') {
+        throw new Error('Nessuna bolletta energia elettrica trovata nel periodo specificato');
+      }
+    }
+
+    if (type === 'both' && totalGasCost === 0 && totalElecCost === 0) {
+      throw new Error('Nessuna bolletta trovata nel periodo specificato');
     }
 
     // Calcola consumi
-    const consumptions = await calculateConsumptions(month);
+    const consumptions = await calculateConsumptions(dateFrom, dateTo);
 
     if (consumptions.length === 0) {
       throw new Error('Nessun dato di consumo trovato per il mese specificato');
     }
 
     // Ripartisci costi
-    const monthNum = parseInt(month.split('-')[1]);
-    const gasCosts = splitGasCosts(gasBill.amount, consumptions, settings);
-    const elecCosts = splitElectricityCosts(elecBill.amount, consumptions, settings, monthNum);
+    let gasCosts = {};
+    let elecCosts = {};
+
+    if (type === 'gas' || type === 'both') {
+      gasCosts = splitGasCosts(totalGasCost, consumptions, settings);
+    }
+
+    if (type === 'electricity' || type === 'both') {
+      elecCosts = splitElectricityCosts(totalElecCost, consumptions, settings, monthNum);
+    }
 
     // Combina risultati
     const results = [];
@@ -361,11 +400,17 @@ export async function calculateMonthlySplit(month) {
       });
     }
 
+    console.log(`✅ ========== CALCULATION COMPLETE ==========\n`);
+
     return {
-      month: month,
-      total_gas_cost: gasBill.amount,
-      total_elec_cost: elecBill.amount,
-      total_cost: gasBill.amount + elecBill.amount,
+      period: {
+        from: dateFrom,
+        to: dateTo
+      },
+      type: type,
+      total_gas_cost: totalGasCost,
+      total_elec_cost: totalElecCost,
+      total_cost: totalGasCost + totalElecCost,
       units: results
     };
   } catch (error) {

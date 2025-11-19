@@ -25,12 +25,59 @@ export async function generateMonthlyReport(data, outputPath) {
       doc.moveDown(0.5);
 
       // Periodo
-      const [year, month] = data.month.split('-');
-      const monthNames = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-                          'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
-      const monthName = monthNames[parseInt(month) - 1];
+      const formatDate = (dateStr) => {
+        const [y, m, d] = dateStr.split('-');
+        return `${d}/${m}/${y}`;
+      };
 
-      doc.fontSize(14).text(`Periodo: ${monthName} ${year}`, { align: 'center' });
+      doc.fontSize(14).text(`Periodo: ${formatDate(data.period.from)} - ${formatDate(data.period.to)}`, { align: 'center' });
+
+      // Tipo calcolo
+      const typeLabels = {
+        'both': 'Metano + Energia Elettrica',
+        'gas': 'Solo Metano',
+        'electricity': 'Solo Energia Elettrica'
+      };
+      doc.fontSize(12).text(`Tipo: ${typeLabels[data.type] || 'Completo'}`, { align: 'center' });
+      doc.moveDown(1.5);
+
+      // Spiegazione metodologia di calcolo
+      doc.fontSize(11).font('Helvetica-Bold').text('MODALITÀ DI CALCOLO', { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(9).font('Helvetica');
+
+      if (data.type === 'gas' || data.type === 'both') {
+        doc.font('Helvetica-Bold').text('METANO (40% quota fissa + 60% consumi):');
+        doc.font('Helvetica');
+        doc.text('  • Quota Fissa (40%): Divisa per superficie tra unità abitate');
+        doc.text('  • Quota Consumi (60%): Proporzionale ai consumi acqua calda');
+        doc.text('  • Ripartizione: 90% Acqua Calda Sanitaria + 10% Riscaldamento');
+        doc.moveDown(0.3);
+      }
+
+      if (data.type === 'electricity' || data.type === 'both') {
+        doc.font('Helvetica-Bold').text('ENERGIA ELETTRICA (40% quota fissa + 60% stagionale):');
+        doc.font('Helvetica');
+        doc.text('  • Quota Fissa (40%): Divisa per superficie (non abitati al 30%)');
+        doc.text('  • Quota Variabile (60%): Stagionale');
+        doc.text('    - Inverno: 30% Riscaldamento + 30% ACS + 40% ACF');
+        doc.text('    - Estate: 30% Raffrescamento + 30% ACS + 40% ACF');
+        doc.moveDown(0.3);
+      }
+
+      doc.font('Helvetica-Bold').text('COSTI FISSI:');
+      doc.font('Helvetica');
+      doc.text('  • Luci scale: ripartito su 3 appartamenti');
+      doc.text('  • Unità commerciale: quota fissa acqua');
+      doc.moveDown(0.3);
+
+      doc.fontSize(8).fillColor('#666');
+      doc.text('ACS = Acqua Calda Sanitaria | ACF = Acqua Fredda', { align: 'center' });
+      doc.fillColor('black');
+      doc.moveDown(1);
+
+      // Linea separatrice
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown(1);
 
       // Riepilogo totali
@@ -38,8 +85,12 @@ export async function generateMonthlyReport(data, outputPath) {
       doc.moveDown(0.5);
       doc.fontSize(10).font('Helvetica');
 
-      doc.text(`Totale Metano: €${data.total_gas_cost.toFixed(2)}`);
-      doc.text(`Totale Energia Elettrica: €${data.total_elec_cost.toFixed(2)}`);
+      if (data.type === 'gas' || data.type === 'both') {
+        doc.text(`Totale Metano: €${data.total_gas_cost.toFixed(2)}`);
+      }
+      if (data.type === 'electricity' || data.type === 'both') {
+        doc.text(`Totale Energia Elettrica: €${data.total_elec_cost.toFixed(2)}`);
+      }
       doc.font('Helvetica-Bold').text(`Totale Complessivo: €${data.total_cost.toFixed(2)}`);
       doc.font('Helvetica');
       doc.moveDown(1);
@@ -76,30 +127,34 @@ export async function generateMonthlyReport(data, outputPath) {
         doc.text(`  Acqua Fredda: ${unit.consumptions.cold_water.toFixed(2)} m³`);
         doc.moveDown(0.3);
 
-        // Costi Gas
-        doc.fontSize(10).font('Helvetica-Bold').text('Metano:');
-        doc.fontSize(9).font('Helvetica');
-        doc.text(`  Riscaldamento: €${unit.costs.gas_heating.toFixed(2)}`);
-        doc.text(`  Acqua Calda: €${unit.costs.gas_hot_water.toFixed(2)}`);
-        const totalGas = unit.costs.gas_heating + unit.costs.gas_hot_water;
-        doc.font('Helvetica-Bold').text(`  Totale Gas: €${totalGas.toFixed(2)}`);
-        doc.font('Helvetica');
-        doc.moveDown(0.3);
+        // Costi Gas (solo se richiesti)
+        if (data.type === 'gas' || data.type === 'both') {
+          doc.fontSize(10).font('Helvetica-Bold').text('Metano:');
+          doc.fontSize(9).font('Helvetica');
+          doc.text(`  Riscaldamento: €${unit.costs.gas_heating.toFixed(2)}`);
+          doc.text(`  Acqua Calda: €${unit.costs.gas_hot_water.toFixed(2)}`);
+          const totalGas = unit.costs.gas_heating + unit.costs.gas_hot_water;
+          doc.font('Helvetica-Bold').text(`  Totale Gas: €${totalGas.toFixed(2)}`);
+          doc.font('Helvetica');
+          doc.moveDown(0.3);
+        }
 
-        // Costi Energia
-        doc.fontSize(10).font('Helvetica-Bold').text('Energia Elettrica:');
-        doc.fontSize(9).font('Helvetica');
-        doc.text(`  Quota Fissa: €${unit.costs.elec_fixed.toFixed(2)}`);
-        doc.text(`  Riscaldamento: €${unit.costs.elec_heating.toFixed(2)}`);
-        doc.text(`  Raffrescamento: €${unit.costs.elec_cooling.toFixed(2)}`);
-        doc.text(`  Acqua Calda: €${unit.costs.elec_hot_water.toFixed(2)}`);
-        doc.text(`  Acqua Fredda: €${unit.costs.elec_cold_water.toFixed(2)}`);
-        const totalElec = unit.costs.elec_fixed + unit.costs.elec_heating +
-                         unit.costs.elec_cooling + unit.costs.elec_hot_water +
-                         unit.costs.elec_cold_water;
-        doc.font('Helvetica-Bold').text(`  Totale Elettricità: €${totalElec.toFixed(2)}`);
-        doc.font('Helvetica');
-        doc.moveDown(0.5);
+        // Costi Energia (solo se richiesti)
+        if (data.type === 'electricity' || data.type === 'both') {
+          doc.fontSize(10).font('Helvetica-Bold').text('Energia Elettrica:');
+          doc.fontSize(9).font('Helvetica');
+          doc.text(`  Quota Fissa: €${unit.costs.elec_fixed.toFixed(2)}`);
+          doc.text(`  Riscaldamento: €${unit.costs.elec_heating.toFixed(2)}`);
+          doc.text(`  Raffrescamento: €${unit.costs.elec_cooling.toFixed(2)}`);
+          doc.text(`  Acqua Calda: €${unit.costs.elec_hot_water.toFixed(2)}`);
+          doc.text(`  Acqua Fredda: €${unit.costs.elec_cold_water.toFixed(2)}`);
+          const totalElec = unit.costs.elec_fixed + unit.costs.elec_heating +
+                           unit.costs.elec_cooling + unit.costs.elec_hot_water +
+                           unit.costs.elec_cold_water;
+          doc.font('Helvetica-Bold').text(`  Totale Elettricità: €${totalElec.toFixed(2)}`);
+          doc.font('Helvetica');
+          doc.moveDown(0.5);
+        }
 
         // Totale unità
         doc.fontSize(11).font('Helvetica-Bold');

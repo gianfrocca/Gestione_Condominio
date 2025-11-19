@@ -95,7 +95,7 @@ export const billsAPI = {
 
 // Calculations API
 export const calculationsAPI = {
-  calculate: (month) => api.post('/calculations/calculate', { month }),
+  calculate: (dateFrom, dateTo, type = 'both') => api.post('/calculations/calculate', { dateFrom, dateTo, type }),
   getHistory: (params) => api.get('/calculations/history', { params }),
   getAnnualSummary: (year) => api.get(`/calculations/annual-summary/${year}`),
   getMonthlyStats: (month) => api.get(`/calculations/monthly-stats/${month}`),
@@ -112,7 +112,7 @@ export const settingsAPI = {
 
 // Reports API
 export const reportsAPI = {
-  generateMonthly: (month) => api.post('/reports/monthly', { month }, {
+  generateMonthly: (dateFrom, dateTo, type = 'both') => api.post('/reports/monthly', { dateFrom, dateTo, type }, {
     responseType: 'blob'
   }),
   generateAnnual: (year) => api.get(`/reports/annual/${year}`, {
