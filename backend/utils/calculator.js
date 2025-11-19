@@ -277,18 +277,21 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
 
   console.log(`🌡️ Seasonal percentages: heating=${(heatingPct * 100).toFixed(0)}%, cooling=${(coolingPct * 100).toFixed(0)}%, hotWater=${(hotWaterPct * 100).toFixed(0)}%, coldWater=${(coldWaterPct * 100).toFixed(0)}%`);
 
-  // VERIFICA CRITICA: La somma delle percentuali stagionali DEVE essere uguale alla quota volontaria
+  // VERIFICA CRITICA: La somma delle percentuali stagionali + involontaria DEVE essere 100%
   const seasonalSum = heatingPct + coolingPct + hotWaterPct + coldWaterPct;
-  const expectedSum = voluntaryPct;
+  const totalSum = involuntaryPct + seasonalSum;
 
-  console.log(`\n🔍 Verification: seasonal percentages sum = ${(seasonalSum * 100).toFixed(0)}%, expected = ${(expectedSum * 100).toFixed(0)}%`);
+  console.log(`\n🔍 Verification:`);
+  console.log(`   Involuntary: ${(involuntaryPct * 100).toFixed(0)}%`);
+  console.log(`   Seasonal sum: ${(seasonalSum * 100).toFixed(0)}%`);
+  console.log(`   TOTAL: ${(totalSum * 100).toFixed(0)}%`);
 
-  if (Math.abs(seasonalSum - expectedSum) > 0.01) {
-    const error = `ERRORE CONFIGURAZIONE: Le percentuali stagionali (${(seasonalSum * 100).toFixed(0)}%) non sommano alla quota volontaria (${(expectedSum * 100).toFixed(0)}%). Verifica le impostazioni.`;
+  if (Math.abs(totalSum - 1.0) > 0.01) {
+    const error = `ERRORE CONFIGURAZIONE: Le percentuali (involontaria ${(involuntaryPct * 100).toFixed(0)}% + stagionali ${(seasonalSum * 100).toFixed(0)}% = ${(totalSum * 100).toFixed(0)}%) non sommano al 100%. Verifica le impostazioni.`;
     console.error(`\n❌ ${error}`);
     throw new Error(error);
   }
-  console.log(`✅ Seasonal percentages verification passed`);
+  console.log(`✅ Percentages verification passed (sum = 100%)`);
 
   // CRITICAL: Unità "Abitati No" pagano un forfettario fisso e NON partecipano alla ripartizione
   // 1. Sommare tutti i forfettari delle unità non abitate
@@ -309,10 +312,12 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
 
   console.log(`💵 Cost to distribute among inhabited units: €${totalElecCost.toFixed(2)} - €${uninhabitedForfait.toFixed(2)} = €${costToDistribute.toFixed(2)}`);
 
+  // CRITICAL: Le percentuali stagionali sono SUL TOTALE, non sulla quota volontaria!
+  // Quindi applico le percentuali direttamente a costToDistribute
   const involuntaryCost = costToDistribute * involuntaryPct;
-  const voluntaryCost = costToDistribute * voluntaryPct;
 
-  console.log(`💵 Split: involuntary=€${involuntaryCost.toFixed(2)}, voluntary=€${voluntaryCost.toFixed(2)}`);
+  console.log(`\n💵 Cost breakdown (percentages applied to total €${costToDistribute.toFixed(2)}):`);
+  console.log(`   Involuntary (${(involuntaryPct * 100).toFixed(0)}%): €${involuntaryCost.toFixed(2)}`);
 
   // Calcola totali SOLO per le unità ABITATE (quelle che partecipano alla ripartizione)
   const inhabitedUnits = consumptions.filter(u => u.is_inhabited);
@@ -351,18 +356,19 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
   console.log(`   - Hot Water: ${totalHotWater.toFixed(2)} m³`);
   console.log(`   - Cold Water: ${totalColdWater.toFixed(2)} m³`);
 
-  // Calcola costi per categoria
-  const heatingCost = voluntaryCost * heatingPct;
-  const coolingCost = voluntaryCost * coolingPct;
-  const hotWaterCost = voluntaryCost * hotWaterPct;
-  const coldWaterCost = voluntaryCost * coldWaterPct;
+  // CRITICAL FIX: Applica percentuali stagionali sul TOTALE, non sulla quota volontaria!
+  const heatingCost = costToDistribute * heatingPct;
+  const coolingCost = costToDistribute * coolingPct;
+  const hotWaterCost = costToDistribute * hotWaterPct;
+  const coldWaterCost = costToDistribute * coldWaterPct;
 
-  console.log(`\n💰 Cost allocation by category (from €${voluntaryCost.toFixed(2)} voluntary):`);
-  console.log(`   - Heating: €${heatingCost.toFixed(2)} (${(heatingPct * 100).toFixed(0)}%)`);
-  console.log(`   - Cooling: €${coolingCost.toFixed(2)} (${(coolingPct * 100).toFixed(0)}%)`);
-  console.log(`   - Hot Water: €${hotWaterCost.toFixed(2)} (${(hotWaterPct * 100).toFixed(0)}%)`);
-  console.log(`   - Cold Water: €${coldWaterCost.toFixed(2)} (${(coldWaterPct * 100).toFixed(0)}%)`);
-  console.log(`   - SUM: €${(heatingCost + coolingCost + hotWaterCost + coldWaterCost).toFixed(2)}`);
+  console.log(`\n💰 Cost allocation by category (percentages applied to total €${costToDistribute.toFixed(2)}):`);
+  console.log(`   - Heating (${(heatingPct * 100).toFixed(0)}%): €${heatingCost.toFixed(2)}`);
+  console.log(`   - Cooling (${(coolingPct * 100).toFixed(0)}%): €${coolingCost.toFixed(2)}`);
+  console.log(`   - Hot Water (${(hotWaterPct * 100).toFixed(0)}%): €${hotWaterCost.toFixed(2)}`);
+  console.log(`   - Cold Water (${(coldWaterPct * 100).toFixed(0)}%): €${coldWaterCost.toFixed(2)}`);
+  console.log(`   - Involuntary: €${involuntaryCost.toFixed(2)}`);
+  console.log(`   - SUM: €${(involuntaryCost + heatingCost + coolingCost + hotWaterCost + coldWaterCost).toFixed(2)} (should be €${costToDistribute.toFixed(2)})`);
 
   // CRITICAL FIX: Se una categoria ha ZERO consumi totali, quella quota
   // deve essere ripartita comunque (altrimenti si perde denaro!)

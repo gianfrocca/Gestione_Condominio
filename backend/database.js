@@ -313,12 +313,12 @@ export const initDatabase = async () => {
       ['elec_voluntary_pct', '60', 'Percentuale volontaria elettricità'],
       ['summer_start_month', '6', 'Mese inizio estate (1-12)'],
       ['summer_end_month', '9', 'Mese fine estate (1-12)'],
-      ['summer_cooling_pct', '20', 'Percentuale raffrescamento estate (sulla quota volontaria)'],
-      ['summer_hot_water_pct', '20', 'Percentuale ACS estate (sulla quota volontaria)'],
-      ['summer_cold_water_pct', '20', 'Percentuale ACF estate (sulla quota volontaria)'],
-      ['winter_heating_pct', '30', 'Percentuale riscaldamento inverno (sulla quota volontaria)'],
-      ['winter_hot_water_pct', '20', 'Percentuale ACS inverno (sulla quota volontaria)'],
-      ['winter_cold_water_pct', '10', 'Percentuale ACF inverno (sulla quota volontaria)'],
+      ['summer_cooling_pct', '20', 'Percentuale raffrescamento estate (sul totale bolletta)'],
+      ['summer_hot_water_pct', '20', 'Percentuale ACS estate (sul totale bolletta)'],
+      ['summer_cold_water_pct', '20', 'Percentuale ACF estate (sul totale bolletta)'],
+      ['winter_heating_pct', '30', 'Percentuale riscaldamento inverno (sul totale bolletta)'],
+      ['winter_hot_water_pct', '20', 'Percentuale ACS inverno (sul totale bolletta)'],
+      ['winter_cold_water_pct', '10', 'Percentuale ACF inverno (sul totale bolletta)'],
       ['staircase_lights_cost', '2', 'Costo forfettario luci scale (€/mese)'],
       ['commercial_water_fixed', '5', 'Quota fissa commerciale acqua (€/mese)']
     ];
