@@ -102,6 +102,8 @@ export const initDatabase = async () => {
         surface_area REAL NOT NULL,
         is_inhabited BOOLEAN DEFAULT 1,
         is_commercial BOOLEAN DEFAULT 0,
+        monthly_elec_fixed REAL DEFAULT 0,
+        monthly_gas_fixed REAL DEFAULT 0,
         foglio TEXT,
         particella TEXT,
         sub TEXT,
@@ -311,15 +313,14 @@ export const initDatabase = async () => {
       ['elec_voluntary_pct', '60', 'Percentuale volontaria elettricità'],
       ['summer_start_month', '6', 'Mese inizio estate (1-12)'],
       ['summer_end_month', '9', 'Mese fine estate (1-12)'],
-      ['summer_cooling_pct', '20', 'Percentuale raffrescamento estate'],
-      ['summer_hot_water_pct', '20', 'Percentuale ACS estate'],
-      ['summer_cold_water_pct', '20', 'Percentuale ACF estate'],
-      ['winter_heating_pct', '35', 'Percentuale riscaldamento inverno'],
-      ['winter_hot_water_pct', '25', 'Percentuale ACS inverno'],
-      ['winter_cold_water_pct', '10', 'Percentuale ACF inverno'],
+      ['summer_cooling_pct', '20', 'Percentuale raffrescamento estate (sulla quota volontaria)'],
+      ['summer_hot_water_pct', '20', 'Percentuale ACS estate (sulla quota volontaria)'],
+      ['summer_cold_water_pct', '20', 'Percentuale ACF estate (sulla quota volontaria)'],
+      ['winter_heating_pct', '30', 'Percentuale riscaldamento inverno (sulla quota volontaria)'],
+      ['winter_hot_water_pct', '20', 'Percentuale ACS inverno (sulla quota volontaria)'],
+      ['winter_cold_water_pct', '10', 'Percentuale ACF inverno (sulla quota volontaria)'],
       ['staircase_lights_cost', '2', 'Costo forfettario luci scale (€/mese)'],
-      ['commercial_water_fixed', '5', 'Quota fissa commerciale acqua (€/mese)'],
-      ['uninhabited_weight', '0.3', 'Peso unità non abitate (0-1, es. 0.3 = 30%)']
+      ['commercial_water_fixed', '5', 'Quota fissa commerciale acqua (€/mese)']
     ];
 
     for (const [key, value, description] of defaultSettings) {
