@@ -58,6 +58,8 @@ async function calculateConsumptions(dateFrom, dateTo) {
         surface_area: unit.surface_area,
         is_inhabited: unit.is_inhabited,
         is_commercial: unit.is_commercial,
+        monthly_elec_fixed: unit.monthly_elec_fixed || 0,
+        monthly_gas_fixed: unit.monthly_gas_fixed || 0,
         heating: 0,
         hot_water: 0,
         cold_water: 0
