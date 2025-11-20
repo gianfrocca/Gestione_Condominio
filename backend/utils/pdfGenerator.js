@@ -139,14 +139,26 @@ export async function generateMonthlyReport(data, outputPath) {
         if (commonElec > 0) {
           doc.text(`  - Costi Parti Comuni (scale+ascensore): -€${commonElec.toFixed(2)}`);
         }
-        // Calcola forfait totale
+        // Luci scale
+        const staircaseLights = data.units.reduce((sum, u) => sum + (u.costs.elec_staircase_lights || 0), 0);
+        if (staircaseLights > 0) {
+          doc.text(`  - Luci Scale (divise tra unità con luci): -€${staircaseLights.toFixed(2)}`);
+        }
+        // Forfait acqua commerciale
+        const commercialWater = data.units
+          .filter(u => u.is_commercial && u.is_inhabited)
+          .reduce((sum, u) => sum + (u.costs.elec_commercial_water || 0), 0);
+        if (commercialWater > 0) {
+          doc.text(`  - Forfait Acqua Commerciale: -€${commercialWater.toFixed(2)}`);
+        }
+        // Calcola forfait totale appartamenti non abitati
         const elecForfait = data.units
           .filter(u => !u.is_inhabited)
           .reduce((sum, u) => sum + u.costs.elec_fixed, 0);
         if (elecForfait > 0) {
           doc.text(`  - Forfait Unità Non Abitate: -€${elecForfait.toFixed(2)}`);
         }
-        const elecToDistribute = data.total_elec_cost - commonElec - elecForfait;
+        const elecToDistribute = data.total_elec_cost - commonElec - staircaseLights - commercialWater - elecForfait;
         doc.font('Helvetica-Bold').text(`  = Da distribuire tra unità abitate: €${elecToDistribute.toFixed(2)}`);
         doc.font('Helvetica');
         doc.moveDown(0.3);
@@ -249,13 +261,47 @@ export async function generateMonthlyReport(data, outputPath) {
         if (data.type === 'electricity' || data.type === 'both') {
           doc.fontSize(10).font('Helvetica-Bold').text('Energia Elettrica:');
           doc.fontSize(9).font('Helvetica');
-          doc.text(`  Quota Fissa: €${unit.costs.elec_fixed.toFixed(2)}`);
-          doc.text(`  Riscaldamento: €${unit.costs.elec_heating.toFixed(2)}`);
-          doc.text(`  Raffrescamento: €${unit.costs.elec_cooling.toFixed(2)}`);
-          doc.text(`  Acqua Calda: €${unit.costs.elec_hot_water.toFixed(2)}`);
-          doc.text(`  Acqua Fredda: €${unit.costs.elec_cold_water.toFixed(2)}`);
-          const totalElec = unit.costs.elec_fixed + unit.costs.elec_heating +
-                           unit.costs.elec_cooling + unit.costs.elec_hot_water +
+
+          // Luci scale (se presenti)
+          if (unit.costs.elec_staircase_lights > 0) {
+            doc.text(`  Luci Scale: €${unit.costs.elec_staircase_lights.toFixed(2)}`);
+          }
+
+          // Forfait acqua commerciale (se presente)
+          if (unit.costs.elec_commercial_water > 0) {
+            doc.text(`  Forfait Acqua Commerciale: €${unit.costs.elec_commercial_water.toFixed(2)}`);
+          }
+
+          // Quota fissa (rinominata in base al tipo)
+          if (unit.costs.elec_fixed > 0) {
+            if (!unit.is_inhabited) {
+              doc.text(`  Forfait Appartamento Non Abitato: €${unit.costs.elec_fixed.toFixed(2)}`);
+            } else {
+              doc.text(`  Quota Involontaria (per mq): €${unit.costs.elec_fixed.toFixed(2)}`);
+            }
+          }
+
+          // Quote variabili
+          if (unit.costs.elec_heating > 0) {
+            doc.text(`  Riscaldamento: €${unit.costs.elec_heating.toFixed(2)}`);
+          }
+          if (unit.costs.elec_cooling > 0) {
+            doc.text(`  Raffrescamento: €${unit.costs.elec_cooling.toFixed(2)}`);
+          }
+          if (unit.costs.elec_hot_water > 0) {
+            doc.text(`  Acqua Calda: €${unit.costs.elec_hot_water.toFixed(2)}`);
+          }
+          if (unit.costs.elec_cold_water > 0) {
+            doc.text(`  Acqua Fredda (consumi): €${unit.costs.elec_cold_water.toFixed(2)}`);
+          }
+
+          // Calcolo totale CORRETTO includendo TUTTI i campi
+          const totalElec = (unit.costs.elec_staircase_lights || 0) +
+                           (unit.costs.elec_commercial_water || 0) +
+                           unit.costs.elec_fixed +
+                           unit.costs.elec_heating +
+                           unit.costs.elec_cooling +
+                           unit.costs.elec_hot_water +
                            unit.costs.elec_cold_water;
           doc.font('Helvetica-Bold').text(`  Totale Elettricità: €${totalElec.toFixed(2)}`);
           doc.font('Helvetica');
