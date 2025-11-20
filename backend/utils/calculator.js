@@ -452,9 +452,13 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
   const inhabitedUnits = consumptions.filter(u => u.is_inhabited);
   const uninhabitedUnits = consumptions.filter(u => !u.is_inhabited);
 
-  const totalSurface = inhabitedUnits.reduce((sum, u) => sum + u.surface_area, 0);
+  // CRITICAL FIX: Superficie solo per unità residenziali (non commerciali)
+  // Le unità commerciali NON partecipano alla quota involontaria
+  const totalSurface = inhabitedUnits
+    .filter(u => !u.is_commercial)
+    .reduce((sum, u) => sum + u.surface_area, 0);
 
-  console.log(`\n📏 Total surface (inhabited only): ${totalSurface.toFixed(2)} m²`);
+  console.log(`\n📏 Total surface (inhabited non-commercial only): ${totalSurface.toFixed(2)} m²`);
   console.log(`📊 Inhabited units breakdown:`);
   inhabitedUnits.forEach(u => {
     console.log(`   - ${u.unit_number} (${u.unit_name}): ${u.surface_area}m² [commercial=${u.is_commercial}]`);
@@ -565,12 +569,17 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
 
     // UNITÀ ABITATE: partecipano alla ripartizione normale
 
-    // Quota involontaria (base superficie) + quota redistribuita
-    const unitInvoluntary = totalSurface > 0
+    // Quota involontaria (base superficie) - SOLO per unità residenziali (non commerciali)
+    // Le unità commerciali NON partecipano alla quota involontaria
+    const unitInvoluntary = (!unit.is_commercial && totalSurface > 0)
       ? (adjustedInvoluntaryCost * unit.surface_area) / totalSurface
       : 0;
 
-    console.log(`      Involuntary: €${adjustedInvoluntaryCost.toFixed(2)} × ${unit.surface_area.toFixed(2)}/${totalSurface.toFixed(2)} = €${unitInvoluntary.toFixed(2)}`);
+    if (unit.is_commercial) {
+      console.log(`      Commercial unit: skips involuntary quota (pays only water forfait + ACF consumption)`);
+    } else {
+      console.log(`      Involuntary: €${adjustedInvoluntaryCost.toFixed(2)} × ${unit.surface_area.toFixed(2)}/${totalSurface.toFixed(2)} = €${unitInvoluntary.toFixed(2)}`);
+    }
     totalDistributedInvoluntary += unitInvoluntary;
 
     // Quota volontaria riscaldamento (solo residenziali)
