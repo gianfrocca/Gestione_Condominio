@@ -29,12 +29,50 @@ router.get('/:id', async (req, res) => {
 // POST: Crea nuova unità
 router.post('/', async (req, res) => {
   try {
-    const { number, name, surface_area, is_inhabited, is_commercial, monthly_elec_fixed, monthly_gas_fixed, notes } = req.body;
+    const {
+      number,
+      name,
+      surface_area,
+      is_inhabited,
+      is_commercial,
+      has_staircase_lights,
+      monthly_water_fixed,
+      monthly_elec_fixed_winter,
+      monthly_elec_fixed_summer,
+      monthly_gas_fixed_winter,
+      monthly_gas_fixed_summer,
+      foglio,
+      particella,
+      sub,
+      notes
+    } = req.body;
 
     const result = await runQuery(
-      `INSERT INTO units (number, name, surface_area, is_inhabited, is_commercial, monthly_elec_fixed, monthly_gas_fixed, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [number, name, surface_area, is_inhabited || 1, is_commercial || 0, monthly_elec_fixed || 0, monthly_gas_fixed || 0, notes || null]
+      `INSERT INTO units (
+        number, name, surface_area, is_inhabited, is_commercial,
+        has_staircase_lights, monthly_water_fixed,
+        monthly_elec_fixed_winter, monthly_elec_fixed_summer,
+        monthly_gas_fixed_winter, monthly_gas_fixed_summer,
+        foglio, particella, sub, notes
+      )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        number,
+        name,
+        surface_area,
+        is_inhabited || 1,
+        is_commercial || 0,
+        has_staircase_lights || 0,
+        monthly_water_fixed || 0,
+        monthly_elec_fixed_winter || 0,
+        monthly_elec_fixed_summer || 0,
+        monthly_gas_fixed_winter || 0,
+        monthly_gas_fixed_summer || 0,
+        foglio || null,
+        particella || null,
+        sub || null,
+        notes || null
+      ]
     );
 
     const newUnit = await getQuery('SELECT * FROM units WHERE id = ?', [result.id]);
@@ -47,13 +85,50 @@ router.post('/', async (req, res) => {
 // PUT: Aggiorna unità
 router.put('/:id', async (req, res) => {
   try {
-    const { number, name, surface_area, is_inhabited, is_commercial, monthly_elec_fixed, monthly_gas_fixed, notes } = req.body;
+    const {
+      number,
+      name,
+      surface_area,
+      is_inhabited,
+      is_commercial,
+      has_staircase_lights,
+      monthly_water_fixed,
+      monthly_elec_fixed_winter,
+      monthly_elec_fixed_summer,
+      monthly_gas_fixed_winter,
+      monthly_gas_fixed_summer,
+      foglio,
+      particella,
+      sub,
+      notes
+    } = req.body;
 
     await runQuery(
       `UPDATE units
-       SET number = ?, name = ?, surface_area = ?, is_inhabited = ?, is_commercial = ?, monthly_elec_fixed = ?, monthly_gas_fixed = ?, notes = ?
+       SET number = ?, name = ?, surface_area = ?, is_inhabited = ?, is_commercial = ?,
+           has_staircase_lights = ?, monthly_water_fixed = ?,
+           monthly_elec_fixed_winter = ?, monthly_elec_fixed_summer = ?,
+           monthly_gas_fixed_winter = ?, monthly_gas_fixed_summer = ?,
+           foglio = ?, particella = ?, sub = ?, notes = ?
        WHERE id = ?`,
-      [number, name, surface_area, is_inhabited, is_commercial, monthly_elec_fixed || 0, monthly_gas_fixed || 0, notes, req.params.id]
+      [
+        number,
+        name,
+        surface_area,
+        is_inhabited,
+        is_commercial,
+        has_staircase_lights || 0,
+        monthly_water_fixed || 0,
+        monthly_elec_fixed_winter || 0,
+        monthly_elec_fixed_summer || 0,
+        monthly_gas_fixed_winter || 0,
+        monthly_gas_fixed_summer || 0,
+        foglio,
+        particella,
+        sub,
+        notes,
+        req.params.id
+      ]
     );
 
     const updated = await getQuery('SELECT * FROM units WHERE id = ?', [req.params.id]);
