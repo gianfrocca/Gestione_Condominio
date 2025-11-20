@@ -141,8 +141,10 @@ export async function generateMonthlyReport(data, outputPath) {
         }
         // Luci scale
         const staircaseLights = data.units.reduce((sum, u) => sum + (u.costs.elec_staircase_lights || 0), 0);
+        const numUnitsWithLights = data.units.filter(u => u.costs.elec_staircase_lights > 0).length;
         if (staircaseLights > 0) {
-          doc.text(`  - Luci Scale (divise tra unità con luci): -€${staircaseLights.toFixed(2)}`);
+          const perUnit = numUnitsWithLights > 0 ? staircaseLights / numUnitsWithLights : 0;
+          doc.text(`  - Luci Scale (${numUnitsWithLights} unità × €${perUnit.toFixed(2)}): -€${staircaseLights.toFixed(2)}`);
         }
         // Forfait acqua commerciale
         const commercialWater = data.units
@@ -173,11 +175,13 @@ export async function generateMonthlyReport(data, outputPath) {
       doc.moveDown(1);
 
       // Dettaglio per unità
+      let isFirstUnit = true;
       for (const unit of data.units) {
-        // Controlla se c'è spazio, altrimenti nuova pagina
-        if (doc.y > 650) {
+        // Nuova pagina per ogni unità (tranne la prima)
+        if (!isFirstUnit) {
           doc.addPage();
         }
+        isFirstUnit = false;
 
         doc.fontSize(12).font('Helvetica-Bold');
         doc.text(`${unit.unit_number} - ${unit.unit_name}`, { underline: true });
@@ -228,7 +232,7 @@ export async function generateMonthlyReport(data, outputPath) {
             };
 
             doc.text(typeLabel, startX, y, { width: 70 });
-            doc.text(reading.meter_code || 'N/A', startX + 70, y, { width: 50 });
+            doc.text(reading.meter_code || '-', startX + 70, y, { width: 50 });
             doc.text(`${reading.start_value.toFixed(1)} (${formatDate(reading.start_date)})`, startX + 120, y, { width: 80, lineBreak: false });
             doc.text(`${reading.end_value.toFixed(1)} (${formatDate(reading.end_date)})`, startX + 200, y, { width: 80, lineBreak: false });
             doc.text(`${reading.consumption.toFixed(1)}`, startX + 280, y, { width: 60 });
@@ -314,17 +318,10 @@ export async function generateMonthlyReport(data, outputPath) {
         doc.text(`TOTALE DA PAGARE: €${unit.costs.total.toFixed(2)}`);
         doc.fillColor('black');
         doc.font('Helvetica');
-        doc.moveDown(1);
-
-        // Linea separatrice
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-        doc.moveDown(1);
       }
 
-      // TABELLA RIEPILOGO FINALE
-      if (doc.y > 600) {
-        doc.addPage();
-      }
+      // TABELLA RIEPILOGO FINALE - Sempre su nuova pagina
+      doc.addPage();
 
       doc.fontSize(14).font('Helvetica-Bold').text('TABELLA RIEPILOGO', { align: 'center' });
       doc.moveDown(1);
