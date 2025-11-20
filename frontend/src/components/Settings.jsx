@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Save, Settings as SettingsIcon, Building2, Calendar, Sliders, DollarSign, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
-import { settingsAPI, unitsAPI } from '../services/api';
+import { Save, Settings as SettingsIcon, Building2, Calendar, Sliders, DollarSign, Plus, Trash2, Edit2, Check, X, Download, Upload, FileSpreadsheet, Database } from 'lucide-react';
+import { settingsAPI, unitsAPI, backupAPI, excelAPI } from '../services/api';
 
 function Settings() {
   const [activeTab, setActiveTab] = useState('parametri');
@@ -142,6 +142,7 @@ function Settings() {
     { id: 'stagionalita', name: 'Stagionalità', icon: Calendar },
     { id: 'forfettari', name: 'Costi Forfettari', icon: DollarSign },
     { id: 'unita', name: 'Unità Immobiliari', icon: Building2 },
+    { id: 'backup', name: 'Backup & Export', icon: Database },
   ];
 
   if (loading) {
@@ -1018,6 +1019,206 @@ function Settings() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'backup' && (
+        <div className="space-y-6">
+          {/* Backup SQL */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <Database className="h-5 w-5 mr-2" />
+              Backup Database (SQL)
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Esporta e importa il database completo in formato SQL. Utile per backup rapidi durante i test.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const { data } = await backupAPI.exportSQL();
+                      const url = window.URL.createObjectURL(new Blob([data]));
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', `backup_${new Date().toISOString().split('T')[0]}.sql`);
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      alert('Backup SQL esportato con successo!');
+                    } catch (error) {
+                      console.error('Errore export SQL:', error);
+                      alert('Errore durante l\'export SQL');
+                    }
+                  }}
+                  className="btn-primary w-full flex items-center justify-center space-x-2"
+                >
+                  <Download className="h-5 w-5" />
+                  <span>Esporta SQL</span>
+                </button>
+                <p className="text-xs text-gray-500 mt-2">
+                  Scarica un file .sql con tutti i dati e la struttura
+                </p>
+              </div>
+              <div>
+                <label className="btn-secondary w-full flex items-center justify-center space-x-2 cursor-pointer">
+                  <Upload className="h-5 w-5" />
+                  <span>Importa SQL</span>
+                  <input
+                    type="file"
+                    accept=".sql"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+
+                      if (!confirm('ATTENZIONE: Questa operazione sovrascriverà tutti i dati attuali. Continuare?')) {
+                        e.target.value = '';
+                        return;
+                      }
+
+                      try {
+                        await backupAPI.importSQL(file);
+                        alert('Database importato con successo! Ricarica la pagina.');
+                        window.location.reload();
+                      } catch (error) {
+                        console.error('Errore import SQL:', error);
+                        alert('Errore durante l\'import: ' + (error.response?.data?.error || error.message));
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <p className="text-xs text-gray-500 mt-2">
+                  Ripristina da un file .sql precedentemente esportato
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>⚠️ Importante:</strong> L'import sovrascriverà TUTTI i dati esistenti. Esporta sempre un backup prima di importare.
+              </p>
+            </div>
+          </div>
+
+          {/* Database SQLite Binario */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <Database className="h-5 w-5 mr-2" />
+              Database SQLite Completo
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Scarica una copia completa del database SQLite (file binario).
+            </p>
+            <button
+              onClick={async () => {
+                try {
+                  const { data } = await backupAPI.downloadDatabase();
+                  const url = window.URL.createObjectURL(new Blob([data]));
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute('download', `database_${new Date().toISOString().split('T')[0]}.sqlite`);
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  alert('Database scaricato con successo!');
+                } catch (error) {
+                  console.error('Errore download database:', error);
+                  alert('Errore durante il download del database');
+                }
+              }}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <Download className="h-5 w-5" />
+              <span>Scarica Database SQLite</span>
+            </button>
+          </div>
+
+          {/* Export Excel */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <FileSpreadsheet className="h-5 w-5 mr-2" />
+              Export Report Excel
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Esporta un report di ripartizione in formato Excel con tutti i calcoli e dettagli.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data Inizio
+                </label>
+                <input
+                  type="date"
+                  id="excelDateFrom"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data Fine
+                </label>
+                <input
+                  type="date"
+                  id="excelDateTo"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo
+                </label>
+                <select id="excelType" className="input">
+                  <option value="both">Gas + Elettricità</option>
+                  <option value="gas">Solo Gas</option>
+                  <option value="electricity">Solo Elettricità</option>
+                </select>
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                const dateFrom = document.getElementById('excelDateFrom').value;
+                const dateTo = document.getElementById('excelDateTo').value;
+                const type = document.getElementById('excelType').value;
+
+                if (!dateFrom || !dateTo) {
+                  alert('Seleziona le date');
+                  return;
+                }
+
+                try {
+                  const { data } = await excelAPI.exportReport(dateFrom, dateTo, type);
+                  const url = window.URL.createObjectURL(new Blob([data]));
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute('download', `report_${dateFrom}_${dateTo}.xlsx`);
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  alert('Report Excel esportato con successo!');
+                } catch (error) {
+                  console.error('Errore export Excel:', error);
+                  alert('Errore durante l\'export Excel: ' + (error.response?.data?.error || error.message));
+                }
+              }}
+              className="btn-primary mt-4 flex items-center space-x-2"
+            >
+              <FileSpreadsheet className="h-5 w-5" />
+              <span>Esporta Report Excel</span>
+            </button>
+
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-sm font-semibold text-blue-900 mb-2">📊 Il file Excel include:</h3>
+              <ul className="list-disc list-inside text-sm text-blue-800 space-y-1">
+                <li>Riepilogo generale con totali</li>
+                <li>Dettaglio per unità con tutti i costi (gas, elettricità, forfait, ecc.)</li>
+                <li>Letture contabilizzatori con date e consumi</li>
+                <li>Formule automatiche per i totali</li>
+              </ul>
             </div>
           </div>
         </div>

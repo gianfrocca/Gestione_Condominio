@@ -161,6 +161,27 @@ export const usersAPI = {
   resetPassword: (id, newPassword) => api.post(`/users/${id}/reset-password`, { newPassword }),
 };
 
+// Backup API
+export const backupAPI = {
+  exportSQL: () => api.get('/backup/export-sql', { responseType: 'blob' }),
+  importSQL: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/backup/import-sql', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  downloadDatabase: () => api.get('/backup/download-db', { responseType: 'blob' }),
+};
+
+// Excel API
+export const excelAPI = {
+  exportReport: (dateFrom, dateTo, type = 'both') => api.get('/excel/export-report', {
+    params: { dateFrom, dateTo, type },
+    responseType: 'blob'
+  }),
+};
+
 // Health check
 export const healthCheck = () => api.get('/health');
 
