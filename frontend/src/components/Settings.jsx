@@ -102,8 +102,12 @@ function Settings() {
       surface_area: '',
       is_inhabited: true,
       is_commercial: false,
-      monthly_elec_fixed: 0,
-      monthly_gas_fixed: 0,
+      has_staircase_lights: false,
+      monthly_water_fixed: 0,
+      monthly_elec_fixed_winter: 0,
+      monthly_elec_fixed_summer: 0,
+      monthly_gas_fixed_winter: 0,
+      monthly_gas_fixed_summer: 0,
       foglio: '',
       particella: '',
       sub: '',
@@ -508,113 +512,65 @@ function Settings() {
                   className="input"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Es: luci scale, ascensore, cancello automatico
+                  Es: ascensore, cancello automatico, luci parti comuni
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Forfait Stagionali Unità Non Abitate - INVERNO */}
+          {/* Luci Scale */}
           <div className="card">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <Calendar className="h-5 w-5 mr-2" />
-              Forfait Default Unità Non Abitate - INVERNO
+              <DollarSign className="h-5 w-5 mr-2" />
+              Luci Scale (Solo Elettricità)
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              Valori di default per unità non abitate durante l'inverno. Puoi sovrascrivere per singola unità nella scheda "Unità Immobiliari".
+              Il costo totale delle luci scale viene diviso EQUAMENTE tra le unità che hanno "Luci Scale = Sì" E "Abitato = Sì"
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gas Inverno (€/mese)
+                  Costo Totale Luci Scale (€/mese)
                 </label>
                 <input
                   type="number"
                   step="0.01"
-                  value={getSetting('uninhabited_gas_winter_monthly')?.value || ''}
-                  onChange={(e) => handleSettingChange('uninhabited_gas_winter_monthly', e.target.value)}
+                  value={getSetting('staircase_lights_monthly')?.value || ''}
+                  onChange={(e) => handleSettingChange('staircase_lights_monthly', e.target.value)}
                   className="input"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Forfait gas default per unità non abitate in inverno
+                  Inserisci il costo mensile totale per le luci scale
                 </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Elettricità Inverno (€/mese)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={getSetting('uninhabited_elec_winter_monthly')?.value || ''}
-                  onChange={(e) => handleSettingChange('uninhabited_elec_winter_monthly', e.target.value)}
-                  className="input"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Forfait elettricità default per unità non abitate in inverno
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Forfait Stagionali Unità Non Abitate - ESTATE */}
-          <div className="card">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <Calendar className="h-5 w-5 mr-2" />
-              Forfait Default Unità Non Abitate - ESTATE
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Valori di default per unità non abitate durante l'estate. Generalmente più bassi rispetto all'inverno.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gas Estate (€/mese)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={getSetting('uninhabited_gas_summer_monthly')?.value || ''}
-                  onChange={(e) => handleSettingChange('uninhabited_gas_summer_monthly', e.target.value)}
-                  className="input"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Forfait gas default per unità non abitate in estate
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Elettricità Estate (€/mese)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={getSetting('uninhabited_elec_summer_monthly')?.value || ''}
-                  onChange={(e) => handleSettingChange('uninhabited_elec_summer_monthly', e.target.value)}
-                  className="input"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Forfait elettricità default per unità non abitate in estate
-                </p>
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-blue-900 mb-2">💡 Come funziona:</p>
+                <ol className="list-decimal list-inside text-xs text-blue-800 space-y-1">
+                  <li>Il costo viene sottratto DOPO i costi parti comuni</li>
+                  <li>Viene diviso EQUAMENTE (non per superficie)</li>
+                  <li>Solo tra unità con "Luci Scale = Sì" nella scheda "Unità Immobiliari"</li>
+                  <li>Solo tra unità con "Abitato = Sì"</li>
+                </ol>
               </div>
             </div>
           </div>
 
           {/* Info about unit-specific forfaits */}
           <div className="card bg-blue-50 border border-blue-200">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">ℹ️ Come Funzionano i Forfait per Unità Non Abitate</h3>
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">ℹ️ Forfait per Unità Non Abitate e Commerciali</h3>
             <p className="text-sm text-blue-800 mb-2">
-              Il sistema usa i valori stagionali di default (sopra) per tutte le unità non abitate.
+              I forfait stagionali (inverno/estate) per unità non abitate e il forfait acqua per unità commerciali si configurano direttamente nella scheda <strong>"Unità Immobiliari"</strong>.
             </p>
             <p className="text-sm text-blue-800 mb-2">
-              <strong>Per personalizzare il forfait di una specifica unità:</strong>
+              <strong>Per impostare i forfait:</strong>
             </p>
             <ol className="list-decimal list-inside text-sm text-blue-800 mt-2 space-y-1">
               <li>Vai alla scheda <strong>"Unità Immobiliari"</strong></li>
-              <li>Modifica un'unità e imposta <strong>"Abitato = No"</strong></li>
-              <li>Inserisci valori personalizzati nei campi <strong>"Forfait Luce (€/mese)"</strong> e <strong>"Forfait Gas (€/mese)"</strong></li>
-              <li>Se lasci a 0, verrà usato il forfait stagionale di default</li>
-              <li>Le unità non abitate pagano SOLO il forfettario e NON partecipano alla ripartizione proporzionale</li>
+              <li>Modifica un'unità</li>
+              <li>Per unità <strong>NON abitate</strong>: imposta i campi stagionali (Forfait Luce/Gas Inverno ed Estate)</li>
+              <li>Per unità <strong>commerciali</strong>: imposta il campo "Forfait Acqua (€/mese)"</li>
+              <li>Le unità non abitate pagano SOLO il forfettario stagionale e NON partecipano alla ripartizione</li>
+              <li>Le unità commerciali pagano il forfait acqua E partecipano alla distribuzione ACF (Acqua Fredda)</li>
             </ol>
           </div>
         </div>
@@ -644,8 +600,12 @@ function Settings() {
                     <th>Superficie (mq)</th>
                     <th>Abitato</th>
                     <th>Commerciale</th>
-                    <th>Forfait Luce (€/mese)</th>
-                    <th>Forfait Gas (€/mese)</th>
+                    <th>Luci Scale</th>
+                    <th>Forfait Acqua (€/mese)</th>
+                    <th>Forfait Luce Inv. (€/mese)</th>
+                    <th>Forfait Luce Est. (€/mese)</th>
+                    <th>Forfait Gas Inv. (€/mese)</th>
+                    <th>Forfait Gas Est. (€/mese)</th>
                     <th>Foglio</th>
                     <th>Particella</th>
                     <th>Sub</th>
@@ -700,12 +660,24 @@ function Settings() {
                         />
                       </td>
                       <td>
-                        {!newUnit.is_inhabited ? (
+                        {newUnit.is_inhabited ? (
+                          <input
+                            type="checkbox"
+                            checked={newUnit.has_staircase_lights}
+                            onChange={(e) => setNewUnit({ ...newUnit, has_staircase_lights: e.target.checked })}
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
+                      </td>
+                      <td>
+                        {newUnit.is_commercial && newUnit.is_inhabited ? (
                           <input
                             type="number"
                             step="0.01"
-                            value={newUnit.monthly_elec_fixed || 0}
-                            onChange={(e) => setNewUnit({ ...newUnit, monthly_elec_fixed: parseFloat(e.target.value) || 0 })}
+                            value={newUnit.monthly_water_fixed || 0}
+                            onChange={(e) => setNewUnit({ ...newUnit, monthly_water_fixed: parseFloat(e.target.value) || 0 })}
                             placeholder="0.00"
                             className="input input-sm w-20"
                           />
@@ -718,8 +690,50 @@ function Settings() {
                           <input
                             type="number"
                             step="0.01"
-                            value={newUnit.monthly_gas_fixed || 0}
-                            onChange={(e) => setNewUnit({ ...newUnit, monthly_gas_fixed: parseFloat(e.target.value) || 0 })}
+                            value={newUnit.monthly_elec_fixed_winter || 0}
+                            onChange={(e) => setNewUnit({ ...newUnit, monthly_elec_fixed_winter: parseFloat(e.target.value) || 0 })}
+                            placeholder="0.00"
+                            className="input input-sm w-20"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
+                      </td>
+                      <td>
+                        {!newUnit.is_inhabited ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={newUnit.monthly_elec_fixed_summer || 0}
+                            onChange={(e) => setNewUnit({ ...newUnit, monthly_elec_fixed_summer: parseFloat(e.target.value) || 0 })}
+                            placeholder="0.00"
+                            className="input input-sm w-20"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
+                      </td>
+                      <td>
+                        {!newUnit.is_inhabited ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={newUnit.monthly_gas_fixed_winter || 0}
+                            onChange={(e) => setNewUnit({ ...newUnit, monthly_gas_fixed_winter: parseFloat(e.target.value) || 0 })}
+                            placeholder="0.00"
+                            className="input input-sm w-20"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
+                      </td>
+                      <td>
+                        {!newUnit.is_inhabited ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={newUnit.monthly_gas_fixed_summer || 0}
+                            onChange={(e) => setNewUnit({ ...newUnit, monthly_gas_fixed_summer: parseFloat(e.target.value) || 0 })}
                             placeholder="0.00"
                             className="input input-sm w-20"
                           />
@@ -820,12 +834,24 @@ function Settings() {
                           />
                         </td>
                         <td>
-                          {!editingUnit.is_inhabited ? (
+                          {editingUnit.is_inhabited ? (
+                            <input
+                              type="checkbox"
+                              checked={editingUnit.has_staircase_lights || false}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, has_staircase_lights: e.target.checked })}
+                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                            />
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </td>
+                        <td>
+                          {editingUnit.is_commercial && editingUnit.is_inhabited ? (
                             <input
                               type="number"
                               step="0.01"
-                              value={editingUnit.monthly_elec_fixed || 0}
-                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_elec_fixed: parseFloat(e.target.value) || 0 })}
+                              value={editingUnit.monthly_water_fixed || 0}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_water_fixed: parseFloat(e.target.value) || 0 })}
                               className="input input-sm w-20"
                             />
                           ) : (
@@ -837,8 +863,47 @@ function Settings() {
                             <input
                               type="number"
                               step="0.01"
-                              value={editingUnit.monthly_gas_fixed || 0}
-                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_gas_fixed: parseFloat(e.target.value) || 0 })}
+                              value={editingUnit.monthly_elec_fixed_winter || 0}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_elec_fixed_winter: parseFloat(e.target.value) || 0 })}
+                              className="input input-sm w-20"
+                            />
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </td>
+                        <td>
+                          {!editingUnit.is_inhabited ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingUnit.monthly_elec_fixed_summer || 0}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_elec_fixed_summer: parseFloat(e.target.value) || 0 })}
+                              className="input input-sm w-20"
+                            />
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </td>
+                        <td>
+                          {!editingUnit.is_inhabited ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingUnit.monthly_gas_fixed_winter || 0}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_gas_fixed_winter: parseFloat(e.target.value) || 0 })}
+                              className="input input-sm w-20"
+                            />
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </td>
+                        <td>
+                          {!editingUnit.is_inhabited ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingUnit.monthly_gas_fixed_summer || 0}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, monthly_gas_fixed_summer: parseFloat(e.target.value) || 0 })}
                               className="input input-sm w-20"
                             />
                           ) : (
@@ -903,11 +968,29 @@ function Settings() {
                             {unit.is_commercial ? 'Sì' : 'No'}
                           </span>
                         </td>
-                        <td className={!unit.is_inhabited ? 'font-medium' : 'text-gray-400'}>
-                          {!unit.is_inhabited ? `€${(unit.monthly_elec_fixed || 0).toFixed(2)}` : '-'}
+                        <td>
+                          {unit.is_inhabited ? (
+                            <span className={`badge ${unit.has_staircase_lights ? 'badge-green' : 'badge-gray'}`}>
+                              {unit.has_staircase_lights ? 'Sì' : 'No'}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className={unit.is_commercial && unit.is_inhabited ? 'font-medium' : 'text-gray-400'}>
+                          {unit.is_commercial && unit.is_inhabited ? `€${(unit.monthly_water_fixed || 0).toFixed(2)}` : '-'}
                         </td>
                         <td className={!unit.is_inhabited ? 'font-medium' : 'text-gray-400'}>
-                          {!unit.is_inhabited ? `€${(unit.monthly_gas_fixed || 0).toFixed(2)}` : '-'}
+                          {!unit.is_inhabited ? `€${(unit.monthly_elec_fixed_winter || 0).toFixed(2)}` : '-'}
+                        </td>
+                        <td className={!unit.is_inhabited ? 'font-medium' : 'text-gray-400'}>
+                          {!unit.is_inhabited ? `€${(unit.monthly_elec_fixed_summer || 0).toFixed(2)}` : '-'}
+                        </td>
+                        <td className={!unit.is_inhabited ? 'font-medium' : 'text-gray-400'}>
+                          {!unit.is_inhabited ? `€${(unit.monthly_gas_fixed_winter || 0).toFixed(2)}` : '-'}
+                        </td>
+                        <td className={!unit.is_inhabited ? 'font-medium' : 'text-gray-400'}>
+                          {!unit.is_inhabited ? `€${(unit.monthly_gas_fixed_summer || 0).toFixed(2)}` : '-'}
                         </td>
                         <td className="text-gray-600">{unit.foglio || '-'}</td>
                         <td className="text-gray-600">{unit.particella || '-'}</td>

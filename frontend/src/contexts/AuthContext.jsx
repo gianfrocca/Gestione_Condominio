@@ -16,6 +16,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [accessToken, setAccessToken] = useState(null);
 
+  // Auto-logout dopo 30 minuti di inattività
+  const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minuti in millisecondi
+  const [inactivityTimer, setInactivityTimer] = useState(null);
+
   // Carica token e user dal localStorage all'avvio
   useEffect(() => {
     const initAuth = async () => {
@@ -60,6 +64,50 @@ export const AuthProvider = ({ children }) => {
 
     initAuth();
   }, []);
+
+  // Gestione auto-logout per inattività
+  useEffect(() => {
+    // Solo se l'utente è autenticato
+    if (!user) {
+      return;
+    }
+
+    const resetTimer = () => {
+      // Cancella il timer precedente
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+
+      // Imposta un nuovo timer
+      const newTimer = setTimeout(() => {
+        console.log('Auto-logout per inattività dopo 30 minuti');
+        logout();
+      }, INACTIVITY_TIMEOUT);
+
+      setInactivityTimer(newTimer);
+    };
+
+    // Inizializza il timer
+    resetTimer();
+
+    // Eventi da monitorare per rilevare l'attività dell'utente
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+
+    // Aggiungi event listeners
+    events.forEach(event => {
+      document.addEventListener(event, resetTimer);
+    });
+
+    // Cleanup: rimuovi event listeners e cancella il timer
+    return () => {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      events.forEach(event => {
+        document.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [user, inactivityTimer]);
 
   const login = async (username, password) => {
     try {

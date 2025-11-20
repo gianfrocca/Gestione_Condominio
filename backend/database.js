@@ -102,8 +102,12 @@ export const initDatabase = async () => {
         surface_area REAL NOT NULL,
         is_inhabited BOOLEAN DEFAULT 1,
         is_commercial BOOLEAN DEFAULT 0,
-        monthly_elec_fixed REAL DEFAULT 0,
-        monthly_gas_fixed REAL DEFAULT 0,
+        has_staircase_lights BOOLEAN DEFAULT 0,
+        monthly_water_fixed REAL DEFAULT 0,
+        monthly_elec_fixed_winter REAL DEFAULT 0,
+        monthly_elec_fixed_summer REAL DEFAULT 0,
+        monthly_gas_fixed_winter REAL DEFAULT 0,
+        monthly_gas_fixed_summer REAL DEFAULT 0,
         foglio TEXT,
         particella TEXT,
         sub TEXT,
@@ -128,6 +132,24 @@ export const initDatabase = async () => {
     } catch (e) { /* già esistente */ }
     try {
       await runQuery(`ALTER TABLE units ADD COLUMN sub TEXT`);
+    } catch (e) { /* già esistente */ }
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN has_staircase_lights BOOLEAN DEFAULT 0`);
+    } catch (e) { /* già esistente */ }
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN monthly_water_fixed REAL DEFAULT 0`);
+    } catch (e) { /* già esistente */ }
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN monthly_elec_fixed_winter REAL DEFAULT 0`);
+    } catch (e) { /* già esistente */ }
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN monthly_elec_fixed_summer REAL DEFAULT 0`);
+    } catch (e) { /* già esistente */ }
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN monthly_gas_fixed_winter REAL DEFAULT 0`);
+    } catch (e) { /* già esistente */ }
+    try {
+      await runQuery(`ALTER TABLE units ADD COLUMN monthly_gas_fixed_summer REAL DEFAULT 0`);
     } catch (e) { /* già esistente */ }
 
     // ============================================
@@ -309,15 +331,10 @@ export const initDatabase = async () => {
     const defaultSettings = [
       // Costi Parti Comuni
       ['common_areas_gas_monthly', '50', 'Costo parti comuni gas mensile (€/mese) - es. caldaia condominiale'],
-      ['common_areas_elec_monthly', '80', 'Costo parti comuni elettricità mensile (€/mese) - es. luci scale, ascensore'],
+      ['common_areas_elec_monthly', '80', 'Costo parti comuni elettricità mensile (€/mese) - es. ascensore, cancello automatico'],
 
-      // Forfait Unità Non Abitate - INVERNO
-      ['uninhabited_gas_winter_monthly', '30', 'Forfait gas inverno per unità non abitate (€/mese)'],
-      ['uninhabited_elec_winter_monthly', '40', 'Forfait elettricità inverno per unità non abitate (€/mese)'],
-
-      // Forfait Unità Non Abitate - ESTATE
-      ['uninhabited_gas_summer_monthly', '15', 'Forfait gas estate per unità non abitate (€/mese)'],
-      ['uninhabited_elec_summer_monthly', '25', 'Forfait elettricità estate per unità non abitate (€/mese)'],
+      // Luci Scale
+      ['staircase_lights_monthly', '60', 'Costo totale luci scale mensile (€/mese) - diviso tra unità con luci scale abilitate'],
 
       // Percentuali GAS (stagionali)
       ['gas_involuntary_pct', '40', 'Percentuale involontaria gas (applicata sia in inverno che in estate)'],
@@ -340,11 +357,7 @@ export const initDatabase = async () => {
       // Percentuali ELETTRICITÀ - INVERNO
       ['winter_heating_pct', '30', 'Percentuale riscaldamento inverno (sul totale bolletta)'],
       ['winter_hot_water_pct', '20', 'Percentuale ACS inverno (sul totale bolletta)'],
-      ['winter_cold_water_pct', '10', 'Percentuale ACF inverno (sul totale bolletta)'],
-
-      // LEGACY (da rimuovere se non usati)
-      ['staircase_lights_cost', '2', 'LEGACY - Costo forfettario luci scale (€/mese) - usa common_areas_elec_monthly'],
-      ['commercial_water_fixed', '5', 'LEGACY - Quota fissa commerciale acqua (€/mese)']
+      ['winter_cold_water_pct', '10', 'Percentuale ACF inverno (sul totale bolletta)']
     ];
 
     for (const [key, value, description] of defaultSettings) {
