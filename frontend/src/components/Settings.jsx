@@ -305,10 +305,76 @@ function Settings() {
             </div>
           </div>
 
-          {/* Summer Percentages */}
+          {/* Gas Summer Percentages */}
           <div className="card">
-            <h2 className="text-xl font-semibold mb-4">Percentuali Estate</h2>
+            <h2 className="text-xl font-semibold mb-4">📊 Metano - Percentuali Estate</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Acqua Calda Sanitaria (%)
+                </label>
+                <input
+                  type="number"
+                  value={getSetting('gas_summer_hot_water_pct')?.value || ''}
+                  onChange={(e) => handleSettingChange('gas_summer_hot_water_pct', e.target.value)}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Quota volontaria estate (invol. + questa deve = 100%)
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded flex items-center">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Involontaria: {getSetting('gas_involuntary_pct')?.value || '40'}%</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    (configurabile in "Parametri Consumi")
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Gas Winter Percentages */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4">📊 Metano - Percentuali Inverno</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Riscaldamento (%)
+                </label>
+                <input
+                  type="number"
+                  value={getSetting('gas_winter_heating_pct')?.value || ''}
+                  onChange={(e) => handleSettingChange('gas_winter_heating_pct', e.target.value)}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Acqua Calda Sanitaria (%)
+                </label>
+                <input
+                  type="number"
+                  value={getSetting('gas_winter_hot_water_pct')?.value || ''}
+                  onChange={(e) => handleSettingChange('gas_winter_hot_water_pct', e.target.value)}
+                  className="input"
+                />
+              </div>
+              <div className="bg-gray-50 p-3 rounded flex items-center">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Involontaria: {getSetting('gas_involuntary_pct')?.value || '40'}%</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    (configurabile in "Parametri Consumi")
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Electricity Summer Percentages */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4">⚡ Energia Elettrica - Percentuali Estate</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Raffrescamento (%)
@@ -342,13 +408,21 @@ function Settings() {
                   className="input"
                 />
               </div>
+              <div className="bg-gray-50 p-3 rounded flex items-center">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Involontaria: {getSetting('elec_involuntary_pct')?.value || '40'}%</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    (configurabile in "Parametri Consumi")
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Winter Percentages */}
+          {/* Electricity Winter Percentages */}
           <div className="card">
-            <h2 className="text-xl font-semibold mb-4">Percentuali Inverno</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h2 className="text-xl font-semibold mb-4">⚡ Energia Elettrica - Percentuali Inverno</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Riscaldamento (%)
@@ -382,6 +456,14 @@ function Settings() {
                   className="input"
                 />
               </div>
+              <div className="bg-gray-50 p-3 rounded flex items-center">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Involontaria: {getSetting('elec_involuntary_pct')?.value || '40'}%</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    (configurabile in "Parametri Consumi")
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -389,44 +471,130 @@ function Settings() {
 
       {activeTab === 'forfettari' && (
         <div className="space-y-6">
-          {/* Fixed Costs */}
+          {/* Costi Parti Comuni */}
           <div className="card">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <DollarSign className="h-5 w-5 mr-2" />
-              Costi Forfettari Generali
+              <Building2 className="h-5 w-5 mr-2" />
+              Costi Parti Comuni (Mensili)
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              Questi costi vengono applicati a specifiche unità o situazioni
+              Questi costi vengono sottratti dal totale bolletta PRIMA della ripartizione tra le unità
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Luci Scale (€/mese)
+                  Gas Parti Comuni (€/mese)
                 </label>
                 <input
                   type="number"
                   step="0.01"
-                  value={getSetting('staircase_lights_cost')?.value || ''}
-                  onChange={(e) => handleSettingChange('staircase_lights_cost', e.target.value)}
+                  value={getSetting('common_areas_gas_monthly')?.value || ''}
+                  onChange={(e) => handleSettingChange('common_areas_gas_monthly', e.target.value)}
                   className="input"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Costo mensile forfettario per illuminazione parti comuni
+                  Es: caldaia condominiale, riscaldamento scale
                 </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Quota Fissa Commerciale Acqua (€/mese)
+                  Elettricità Parti Comuni (€/mese)
                 </label>
                 <input
                   type="number"
                   step="0.01"
-                  value={getSetting('commercial_water_fixed')?.value || ''}
-                  onChange={(e) => handleSettingChange('commercial_water_fixed', e.target.value)}
+                  value={getSetting('common_areas_elec_monthly')?.value || ''}
+                  onChange={(e) => handleSettingChange('common_areas_elec_monthly', e.target.value)}
                   className="input"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Quota fissa mensile per unità commerciali
+                  Es: luci scale, ascensore, cancello automatico
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Forfait Stagionali Unità Non Abitate - INVERNO */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <Calendar className="h-5 w-5 mr-2" />
+              Forfait Default Unità Non Abitate - INVERNO
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Valori di default per unità non abitate durante l'inverno. Puoi sovrascrivere per singola unità nella scheda "Unità Immobiliari".
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Gas Inverno (€/mese)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={getSetting('uninhabited_gas_winter_monthly')?.value || ''}
+                  onChange={(e) => handleSettingChange('uninhabited_gas_winter_monthly', e.target.value)}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Forfait gas default per unità non abitate in inverno
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Elettricità Inverno (€/mese)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={getSetting('uninhabited_elec_winter_monthly')?.value || ''}
+                  onChange={(e) => handleSettingChange('uninhabited_elec_winter_monthly', e.target.value)}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Forfait elettricità default per unità non abitate in inverno
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Forfait Stagionali Unità Non Abitate - ESTATE */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <Calendar className="h-5 w-5 mr-2" />
+              Forfait Default Unità Non Abitate - ESTATE
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Valori di default per unità non abitate durante l'estate. Generalmente più bassi rispetto all'inverno.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Gas Estate (€/mese)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={getSetting('uninhabited_gas_summer_monthly')?.value || ''}
+                  onChange={(e) => handleSettingChange('uninhabited_gas_summer_monthly', e.target.value)}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Forfait gas default per unità non abitate in estate
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Elettricità Estate (€/mese)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={getSetting('uninhabited_elec_summer_monthly')?.value || ''}
+                  onChange={(e) => handleSettingChange('uninhabited_elec_summer_monthly', e.target.value)}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Forfait elettricità default per unità non abitate in estate
                 </p>
               </div>
             </div>
@@ -434,15 +602,19 @@ function Settings() {
 
           {/* Info about unit-specific forfaits */}
           <div className="card bg-blue-50 border border-blue-200">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">ℹ️ Forfettari per Unità Non Abitate</h3>
-            <p className="text-sm text-blue-800">
-              Per impostare forfettari mensili di elettricità e gas per unità non abitate:
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">ℹ️ Come Funzionano i Forfait per Unità Non Abitate</h3>
+            <p className="text-sm text-blue-800 mb-2">
+              Il sistema usa i valori stagionali di default (sopra) per tutte le unità non abitate.
+            </p>
+            <p className="text-sm text-blue-800 mb-2">
+              <strong>Per personalizzare il forfait di una specifica unità:</strong>
             </p>
             <ol className="list-decimal list-inside text-sm text-blue-800 mt-2 space-y-1">
               <li>Vai alla scheda <strong>"Unità Immobiliari"</strong></li>
               <li>Modifica un'unità e imposta <strong>"Abitato = No"</strong></li>
-              <li>Inserisci i valori nei campi <strong>"Forfait Luce (€/mese)"</strong> e <strong>"Forfait Gas (€/mese)"</strong></li>
-              <li>Quelle unità pagheranno SOLO il forfettario e NON parteciperanno alla ripartizione</li>
+              <li>Inserisci valori personalizzati nei campi <strong>"Forfait Luce (€/mese)"</strong> e <strong>"Forfait Gas (€/mese)"</strong></li>
+              <li>Se lasci a 0, verrà usato il forfait stagionale di default</li>
+              <li>Le unità non abitate pagano SOLO il forfettario e NON partecipano alla ripartizione proporzionale</li>
             </ol>
           </div>
         </div>

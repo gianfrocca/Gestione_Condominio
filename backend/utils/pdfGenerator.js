@@ -41,38 +41,62 @@ export async function generateMonthlyReport(data, outputPath) {
       doc.fontSize(12).text(`Tipo: ${typeLabels[data.type] || 'Completo'}`, { align: 'center' });
       doc.moveDown(1.5);
 
-      // Spiegazione metodologia di calcolo
-      doc.fontSize(11).font('Helvetica-Bold').text('MODALITÀ DI CALCOLO', { underline: true });
-      doc.moveDown(0.5);
+      // Spiegazione metodologia di calcolo DETTAGLIATA
+      const season = data.season || 'winter';
+      const seasonName = season === 'summer' ? 'ESTATE' : 'INVERNO';
+
+      doc.fontSize(11).font('Helvetica-Bold').text('CRITERI DI RIPARTIZIONE', { underline: true });
+      doc.moveDown(0.3);
       doc.fontSize(9).font('Helvetica');
+      doc.text(`Stagione rilevata: ${seasonName}`, { align: 'center' });
+      doc.moveDown(0.5);
 
       if (data.type === 'gas' || data.type === 'both') {
-        doc.font('Helvetica-Bold').text('METANO (40% quota fissa + 60% consumi):');
+        doc.font('Helvetica-Bold').text('🔥 METANO (Ripartizione Stagionale):');
         doc.font('Helvetica');
-        doc.text('  • Quota Fissa (40%): Divisa per superficie tra unità abitate');
-        doc.text('  • Quota Consumi (60%): Proporzionale ai consumi acqua calda');
-        doc.text('  • Ripartizione: 90% Acqua Calda Sanitaria + 10% Riscaldamento');
+
+        if (season === 'winter') {
+          doc.text(`  INVERNO (attuale):`);
+          doc.text(`  • ${data.settings?.gas_involuntary_pct || 40}% Quota involontaria → distribuita per m²`);
+          doc.text(`  • ${data.settings?.gas_winter_heating_pct || 40}% Riscaldamento → distribuita per consumi riscaldamento`);
+          doc.text(`  • ${data.settings?.gas_winter_hot_water_pct || 20}% Acqua calda → distribuita per consumi ACS`);
+        } else {
+          doc.text(`  ESTATE (attuale):`);
+          doc.text(`  • ${data.settings?.gas_involuntary_pct || 40}% Quota involontaria → distribuita per m²`);
+          doc.text(`  • ${data.settings?.gas_summer_hot_water_pct || 60}% Acqua calda → distribuita per consumi ACS`);
+        }
         doc.moveDown(0.3);
       }
 
       if (data.type === 'electricity' || data.type === 'both') {
-        doc.font('Helvetica-Bold').text('ENERGIA ELETTRICA (40% quota fissa + 60% stagionale):');
+        doc.font('Helvetica-Bold').text('⚡ ENERGIA ELETTRICA (Ripartizione Stagionale):');
         doc.font('Helvetica');
-        doc.text('  • Quota Fissa (40%): Divisa per superficie (non abitati al 30%)');
-        doc.text('  • Quota Variabile (60%): Stagionale');
-        doc.text('    - Inverno: 30% Riscaldamento + 30% ACS + 40% ACF');
-        doc.text('    - Estate: 30% Raffrescamento + 30% ACS + 40% ACF');
+
+        if (season === 'winter') {
+          doc.text(`  INVERNO (attuale):`);
+          doc.text(`  • ${data.settings?.elec_involuntary_pct || 40}% Quota involontaria → distribuita per m²`);
+          doc.text(`  • ${data.settings?.winter_heating_pct || 30}% Riscaldamento → distribuita per consumi riscaldamento`);
+          doc.text(`  • ${data.settings?.winter_hot_water_pct || 20}% Acqua calda → distribuita per consumi ACS`);
+          doc.text(`  • ${data.settings?.winter_cold_water_pct || 10}% Acqua fredda → distribuita per consumi ACF`);
+        } else {
+          doc.text(`  ESTATE (attuale):`);
+          doc.text(`  • ${data.settings?.elec_involuntary_pct || 40}% Quota involontaria → distribuita per m²`);
+          doc.text(`  • ${data.settings?.summer_cooling_pct || 20}% Raffrescamento → distribuita per consumi`);
+          doc.text(`  • ${data.settings?.summer_hot_water_pct || 20}% Acqua calda → distribuita per consumi ACS`);
+          doc.text(`  • ${data.settings?.summer_cold_water_pct || 20}% Acqua fredda → distribuita per consumi ACF`);
+        }
         doc.moveDown(0.3);
       }
 
-      doc.font('Helvetica-Bold').text('COSTI FISSI:');
+      doc.font('Helvetica-Bold').text('📋 NOTE:');
       doc.font('Helvetica');
-      doc.text('  • Luci scale: ripartito su 3 appartamenti');
-      doc.text('  • Unità commerciale: quota fissa acqua');
+      doc.text('  • Le percentuali si applicano sul totale della bolletta');
+      doc.text('  • ACS = Acqua Calda Sanitaria | ACF = Acqua Fredda');
+      doc.text('  • Unità non abitate pagano forfait stagionale fisso');
       doc.moveDown(0.3);
 
       doc.fontSize(8).fillColor('#666');
-      doc.text('ACS = Acqua Calda Sanitaria | ACF = Acqua Fredda', { align: 'center' });
+      doc.text(`Le percentuali possono variare tra inverno ed estate secondo le impostazioni`, { align: 'center' });
       doc.fillColor('black');
       doc.moveDown(1);
 
@@ -80,19 +104,56 @@ export async function generateMonthlyReport(data, outputPath) {
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown(1);
 
-      // Riepilogo totali
-      doc.fontSize(12).font('Helvetica-Bold').text('RIEPILOGO GENERALE');
+      // BREAKDOWN BOLLETTE CON COSTI PARTI COMUNI
+      doc.fontSize(12).font('Helvetica-Bold').text('RIEPILOGO BOLLETTE E COSTI FISSI');
       doc.moveDown(0.5);
-      doc.fontSize(10).font('Helvetica');
+      doc.fontSize(9).font('Helvetica');
+
+      const commonGas = data.common_areas?.gas || 0;
+      const commonElec = data.common_areas?.electricity || 0;
 
       if (data.type === 'gas' || data.type === 'both') {
-        doc.text(`Totale Metano: €${data.total_gas_cost.toFixed(2)}`);
+        doc.font('Helvetica-Bold').text('METANO:');
+        doc.font('Helvetica');
+        doc.text(`  Bollette Totali: €${data.total_gas_cost.toFixed(2)}`);
+        if (commonGas > 0) {
+          doc.text(`  - Costi Parti Comuni (caldaia): -€${commonGas.toFixed(2)}`);
+        }
+        // Calcola forfait totale (sommando da tutte le unità non abitate)
+        const gasForfait = data.units
+          .filter(u => !u.is_inhabited && !u.is_commercial)
+          .reduce((sum, u) => sum + u.costs.gas_heating + u.costs.gas_hot_water, 0);
+        if (gasForfait > 0) {
+          doc.text(`  - Forfait Unità Non Abitate: -€${gasForfait.toFixed(2)}`);
+        }
+        const gasToDistribute = data.total_gas_cost - commonGas - gasForfait;
+        doc.font('Helvetica-Bold').text(`  = Da distribuire tra unità abitate: €${gasToDistribute.toFixed(2)}`);
+        doc.font('Helvetica');
+        doc.moveDown(0.3);
       }
+
       if (data.type === 'electricity' || data.type === 'both') {
-        doc.text(`Totale Energia Elettrica: €${data.total_elec_cost.toFixed(2)}`);
+        doc.font('Helvetica-Bold').text('ENERGIA ELETTRICA:');
+        doc.font('Helvetica');
+        doc.text(`  Bollette Totali: €${data.total_elec_cost.toFixed(2)}`);
+        if (commonElec > 0) {
+          doc.text(`  - Costi Parti Comuni (scale+ascensore): -€${commonElec.toFixed(2)}`);
+        }
+        // Calcola forfait totale
+        const elecForfait = data.units
+          .filter(u => !u.is_inhabited)
+          .reduce((sum, u) => sum + u.costs.elec_fixed, 0);
+        if (elecForfait > 0) {
+          doc.text(`  - Forfait Unità Non Abitate: -€${elecForfait.toFixed(2)}`);
+        }
+        const elecToDistribute = data.total_elec_cost - commonElec - elecForfait;
+        doc.font('Helvetica-Bold').text(`  = Da distribuire tra unità abitate: €${elecToDistribute.toFixed(2)}`);
+        doc.font('Helvetica');
+        doc.moveDown(0.3);
       }
-      doc.font('Helvetica-Bold').text(`Totale Complessivo: €${data.total_cost.toFixed(2)}`);
-      doc.font('Helvetica');
+
+      doc.font('Helvetica-Bold').fontSize(11).text(`TOTALE PERIODO: €${data.total_cost.toFixed(2)}`);
+      doc.font('Helvetica').fontSize(9);
       doc.moveDown(1);
 
       // Linea separatrice
@@ -119,13 +180,58 @@ export async function generateMonthlyReport(data, outputPath) {
 
         doc.moveDown(0.5);
 
-        // Consumi
-        doc.fontSize(10).font('Helvetica-Bold').text('Consumi:');
-        doc.fontSize(9).font('Helvetica');
-        doc.text(`  Riscaldamento: ${unit.consumptions.heating.toFixed(2)} kWh`);
-        doc.text(`  Acqua Calda: ${unit.consumptions.hot_water.toFixed(2)} m³`);
-        doc.text(`  Acqua Fredda: ${unit.consumptions.cold_water.toFixed(2)} m³`);
-        doc.moveDown(0.3);
+        // TABELLA LETTURE CONTABILIZZATORI
+        if (unit.readings && unit.readings.length > 0) {
+          doc.fontSize(10).font('Helvetica-Bold').text('Letture Contabilizzatori:');
+          doc.moveDown(0.3);
+          doc.fontSize(8).font('Helvetica');
+
+          // Header tabella
+          const startX = 60;
+          let y = doc.y;
+          doc.text('Tipo', startX, y, { width: 70 });
+          doc.text('Codice', startX + 70, y, { width: 50 });
+          doc.text('Iniziale', startX + 120, y, { width: 80 });
+          doc.text('Finale', startX + 200, y, { width: 80 });
+          doc.text('Consumo', startX + 280, y, { width: 60 });
+          doc.moveDown(0.3);
+
+          // Linea sotto header
+          doc.moveTo(startX, doc.y).lineTo(startX + 340, doc.y).stroke();
+          doc.moveDown(0.2);
+
+          // Righe dati
+          for (const reading of unit.readings) {
+            y = doc.y;
+            const typeLabel = {
+              'heating': 'Riscaldamento',
+              'hot_water': 'Acqua Calda',
+              'cold_water': 'Acqua Fredda'
+            }[reading.meter_type] || reading.meter_type;
+
+            const formatDate = (dateStr) => {
+              if (!dateStr) return 'N/A';
+              const [yy, mm, dd] = dateStr.split('-');
+              return `${dd}/${mm}/${yy}`;
+            };
+
+            doc.text(typeLabel, startX, y, { width: 70 });
+            doc.text(reading.meter_code || 'N/A', startX + 70, y, { width: 50 });
+            doc.text(`${reading.start_value.toFixed(1)} (${formatDate(reading.start_date)})`, startX + 120, y, { width: 80, lineBreak: false });
+            doc.text(`${reading.end_value.toFixed(1)} (${formatDate(reading.end_date)})`, startX + 200, y, { width: 80, lineBreak: false });
+            doc.text(`${reading.consumption.toFixed(1)}`, startX + 280, y, { width: 60 });
+            doc.moveDown(0.4);
+          }
+          doc.moveDown(0.3);
+        } else {
+          // Consumi (vecchio formato se non ci sono letture)
+          doc.fontSize(10).font('Helvetica-Bold').text('Consumi:');
+          doc.fontSize(9).font('Helvetica');
+          doc.text(`  Riscaldamento: ${unit.consumptions.heating.toFixed(2)} kWh`);
+          doc.text(`  Acqua Calda: ${unit.consumptions.hot_water.toFixed(2)} m³`);
+          doc.text(`  Acqua Fredda: ${unit.consumptions.cold_water.toFixed(2)} m³`);
+          doc.moveDown(0.3);
+        }
 
         // Costi Gas (solo se richiesti)
         if (data.type === 'gas' || data.type === 'both') {

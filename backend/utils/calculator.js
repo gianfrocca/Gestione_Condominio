@@ -42,7 +42,7 @@ async function calculateConsumptions(dateFrom, dateTo) {
 
   // Ottieni tutte le unità con i loro contabilizzatori
   const units = await allQuery(`
-    SELECT u.*, m.id as meter_id, m.type as meter_type
+    SELECT u.*, m.id as meter_id, m.type as meter_type, m.meter_code
     FROM units u
     LEFT JOIN meters m ON u.id = m.unit_id
   `);
@@ -62,7 +62,8 @@ async function calculateConsumptions(dateFrom, dateTo) {
         monthly_gas_fixed: unit.monthly_gas_fixed || 0,
         heating: 0,
         hot_water: 0,
-        cold_water: 0
+        cold_water: 0,
+        readings: [] // Array per le letture dei contabilizzatori
       };
     }
 
@@ -110,6 +111,18 @@ async function calculateConsumptions(dateFrom, dateTo) {
           console.error(`  Possible counter reset or data error.`);
         }
 
+        // Aggiungi letture all'array readings
+        consumptions[unit.id].readings.push({
+          meter_id: unit.meter_id,
+          meter_type: unit.meter_type,
+          meter_code: unit.meter_code || 'N/A',
+          start_value: startReading.value,
+          start_date: startReading.reading_date,
+          end_value: finalEndReading.value,
+          end_date: finalEndReading.reading_date,
+          consumption: Math.max(0, consumption)
+        });
+
         switch (unit.meter_type) {
           case 'heating':
             consumptions[unit.id].heating = Math.max(0, consumption); // Prevent negative
@@ -133,110 +146,184 @@ async function calculateConsumptions(dateFrom, dateTo) {
 }
 
 /**
- * Ripartisce i costi del metano
+ * Ripartisce i costi del metano (con logica stagionale)
  * @param {number} totalGasCost - Costo totale bolletta gas
  * @param {array} consumptions - Array consumi per unità
  * @param {object} settings - Impostazioni
+ * @param {string} season - Stagione ('summer' o 'winter')
  * @returns {object} Costi per unità
  */
-function splitGasCosts(totalGasCost, consumptions, settings) {
-  console.log(`\n🔥 ========== GAS COST SPLIT ==========`);
+function splitGasCosts(totalGasCost, consumptions, settings, season) {
+  console.log(`\n🔥 ========== GAS COST SPLIT (${season.toUpperCase()}) ==========`);
   console.log(`💰 Total gas cost: €${totalGasCost.toFixed(2)}`);
 
-  const involuntaryPct = parseFloat(settings.gas_involuntary_pct) / 100;
-  const voluntaryPct = parseFloat(settings.gas_voluntary_pct) / 100;
+  // STEP 1: Sottrai costi parti comuni
+  const commonAreasCost = parseFloat(settings.common_areas_gas_monthly || 0);
+  console.log(`🏢 Common areas cost: €${commonAreasCost.toFixed(2)}`);
 
-  console.log(`📊 Split: ${(involuntaryPct * 100).toFixed(0)}% involuntary / ${(voluntaryPct * 100).toFixed(0)}% voluntary`);
+  let totalAfterCommonAreas = totalGasCost - commonAreasCost;
 
-  // CRITICAL: Unità "Abitati No" pagano un forfettario fisso e NON partecipano alla ripartizione
-  const uninhabitedForfait = consumptions
-    .filter(u => !u.is_inhabited)
-    .reduce((sum, u) => sum + (u.monthly_gas_fixed || 0), 0);
-
-  console.log(`\n💰 Uninhabited units forfait: €${uninhabitedForfait.toFixed(2)}`);
-
-  const costToDistribute = totalGasCost - uninhabitedForfait;
-
-  if (costToDistribute < 0) {
-    throw new Error(`Errore: i forfettari delle unità non abitate (€${uninhabitedForfait.toFixed(2)}) superano il totale bolletta (€${totalGasCost.toFixed(2)})`);
+  if (totalAfterCommonAreas < 0) {
+    throw new Error(`Errore: i costi parti comuni gas (€${commonAreasCost.toFixed(2)}) superano il totale bolletta (€${totalGasCost.toFixed(2)})`);
   }
 
-  console.log(`💵 Cost to distribute among inhabited units: €${totalGasCost.toFixed(2)} - €${uninhabitedForfait.toFixed(2)} = €${costToDistribute.toFixed(2)}`);
+  console.log(`💵 After common areas: €${totalGasCost.toFixed(2)} - €${commonAreasCost.toFixed(2)} = €${totalAfterCommonAreas.toFixed(2)}`);
 
+  // STEP 2: Calcola forfait stagionali per unità non abitate
+  const forfaitPerUnit = season === 'summer'
+    ? parseFloat(settings.uninhabited_gas_summer_monthly || 0)
+    : parseFloat(settings.uninhabited_gas_winter_monthly || 0);
+
+  console.log(`💰 Seasonal forfait for uninhabited units (${season}): €${forfaitPerUnit.toFixed(2)}/unit`);
+
+  // Calcola forfait totale (unità non abitate possono avere override personalizzato)
+  const uninhabitedForfait = consumptions
+    .filter(u => !u.is_inhabited)
+    .reduce((sum, u) => {
+      // Se l'unità ha un forfait personalizzato, usa quello, altrimenti usa il default stagionale
+      const unitForfait = u.monthly_gas_fixed > 0 ? u.monthly_gas_fixed : forfaitPerUnit;
+      return sum + unitForfait;
+    }, 0);
+
+  console.log(`💰 Total uninhabited units forfait: €${uninhabitedForfait.toFixed(2)}`);
+
+  const costToDistribute = totalAfterCommonAreas - uninhabitedForfait;
+
+  if (costToDistribute < 0) {
+    throw new Error(`Errore: i forfettari delle unità non abitate (€${uninhabitedForfait.toFixed(2)}) superano il costo disponibile (€${totalAfterCommonAreas.toFixed(2)})`);
+  }
+
+  console.log(`💵 Cost to distribute among inhabited units: €${totalAfterCommonAreas.toFixed(2)} - €${uninhabitedForfait.toFixed(2)} = €${costToDistribute.toFixed(2)}`);
+
+  // STEP 3: Percentuali stagionali
+  const involuntaryPct = parseFloat(settings.gas_involuntary_pct) / 100;
+
+  let heatingPct, hotWaterPct;
+
+  if (season === 'summer') {
+    heatingPct = 0;
+    hotWaterPct = parseFloat(settings.gas_summer_hot_water_pct) / 100;
+  } else {
+    heatingPct = parseFloat(settings.gas_winter_heating_pct) / 100;
+    hotWaterPct = parseFloat(settings.gas_winter_hot_water_pct) / 100;
+  }
+
+  console.log(`📊 Seasonal percentages:`);
+  console.log(`   - Involuntary: ${(involuntaryPct * 100).toFixed(0)}%`);
+  console.log(`   - Heating: ${(heatingPct * 100).toFixed(0)}%`);
+  console.log(`   - Hot Water: ${(hotWaterPct * 100).toFixed(0)}%`);
+
+  // Verifica che le percentuali sommino a 100%
+  const totalPct = involuntaryPct + heatingPct + hotWaterPct;
+  if (Math.abs(totalPct - 1.0) > 0.01) {
+    const error = `ERRORE CONFIGURAZIONE GAS: Le percentuali (involontaria ${(involuntaryPct * 100).toFixed(0)}% + riscaldamento ${(heatingPct * 100).toFixed(0)}% + ACS ${(hotWaterPct * 100).toFixed(0)}% = ${(totalPct * 100).toFixed(0)}%) non sommano al 100%.`;
+    console.error(`\n❌ ${error}`);
+    throw new Error(error);
+  }
+  console.log(`✅ Percentages verification passed (sum = 100%)`);
+
+  // STEP 4: Allocazione per categoria (sul TOTALE)
   const involuntaryCost = costToDistribute * involuntaryPct;
-  const voluntaryCost = costToDistribute * voluntaryPct;
+  const heatingCost = costToDistribute * heatingPct;
+  const hotWaterCost = costToDistribute * hotWaterPct;
 
-  console.log(`💵 Split: involuntary=€${involuntaryCost.toFixed(2)}, voluntary=€${voluntaryCost.toFixed(2)}`);
+  console.log(`\n💰 Cost allocation by category (percentages applied to total €${costToDistribute.toFixed(2)}):`);
+  console.log(`   - Involuntary (${(involuntaryPct * 100).toFixed(0)}%): €${involuntaryCost.toFixed(2)}`);
+  console.log(`   - Heating (${(heatingPct * 100).toFixed(0)}%): €${heatingCost.toFixed(2)}`);
+  console.log(`   - Hot Water (${(hotWaterPct * 100).toFixed(0)}%): €${hotWaterCost.toFixed(2)}`);
 
-  // Solo unità residenziali abitate per calcolo superficie
+  // Solo unità residenziali abitate
   const inhabitedUnits = consumptions.filter(u => !u.is_commercial && u.is_inhabited);
-  const uninhabitedUnits = consumptions.filter(u => !u.is_inhabited);
   const totalInhabitedSurface = inhabitedUnits.reduce((sum, u) => sum + u.surface_area, 0);
 
   console.log(`\n📏 Total surface (inhabited non-commercial): ${totalInhabitedSurface.toFixed(2)} m²`);
 
-  // Totale consumi ACS SOLO da unità abitate
-  const totalHotWaterConsumption = inhabitedUnits.reduce((sum, u) => sum + u.hot_water, 0);
+  // Totali consumi SOLO unità abitate
+  const totalHeating = inhabitedUnits.reduce((sum, u) => sum + u.heating, 0);
+  const totalHotWater = inhabitedUnits.reduce((sum, u) => sum + u.hot_water, 0);
 
-  console.log(`🔥 Total hot water consumption (inhabited): ${totalHotWaterConsumption.toFixed(2)} m³`);
+  console.log(`🔥 Total consumptions (inhabited):`);
+  console.log(`   - Heating: ${totalHeating.toFixed(2)} kWh`);
+  console.log(`   - Hot Water: ${totalHotWater.toFixed(2)} m³`);
 
-  // CRITICAL FIX: Se non ci sono consumi ACS, redistribuisci quota volontaria
-  let adjustedGasInvoluntaryCost = involuntaryCost;
-  let adjustedGasVoluntaryCost = voluntaryCost;
+  // STEP 5: Gestione categorie con ZERO consumi
+  let redistributedCost = 0;
 
-  if (totalHotWaterConsumption === 0 && voluntaryCost > 0) {
-    console.log(`⚠️ Zero gas hot water consumption. Redistributing €${voluntaryCost.toFixed(2)} to fixed quota`);
-    adjustedGasInvoluntaryCost = involuntaryCost + voluntaryCost;
-    adjustedGasVoluntaryCost = 0;
+  console.log(`\n🔄 Checking for categories with zero consumption...`);
+
+  if (totalHeating === 0 && heatingPct > 0) {
+    console.log(`   ⚠️ Zero heating consumption. Redistributing €${heatingCost.toFixed(2)} to fixed quota`);
+    redistributedCost += heatingCost;
   }
 
-  console.log(`💡 Adjusted Gas - Involuntary: €${adjustedGasInvoluntaryCost.toFixed(2)}, Voluntary: €${adjustedGasVoluntaryCost.toFixed(2)}`);
+  if (totalHotWater === 0 && hotWaterPct > 0) {
+    console.log(`   ⚠️ Zero hot water consumption. Redistributing €${hotWaterCost.toFixed(2)} to fixed quota`);
+    redistributedCost += hotWaterCost;
+  }
 
+  const adjustedInvoluntaryCost = involuntaryCost + redistributedCost;
+
+  console.log(`\n💡 Final involuntary cost calculation:`);
+  console.log(`   Base involuntary: €${involuntaryCost.toFixed(2)}`);
+  console.log(`   + Redistributed (from zero-consumption categories): €${redistributedCost.toFixed(2)}`);
+  console.log(`   = Adjusted involuntary: €${adjustedInvoluntaryCost.toFixed(2)}`);
+
+  // STEP 6: Distribuzione alle unità
   const results = {};
 
+  console.log(`\n💵 Distributing costs to units...`);
+
   for (const unit of consumptions) {
+    console.log(`\n   📍 Unit ${unit.unit_number} (${unit.unit_name}):`);
+
     // Commerciali: non partecipano al gas
     if (unit.is_commercial) {
       results[unit.unit_id] = { heating: 0, hot_water: 0 };
+      console.log(`      ⚠️ Commercial unit: does NOT participate in gas distribution`);
       continue;
     }
 
-    // UNITÀ NON ABITATE: pagano SOLO il forfettario
+    // UNITÀ NON ABITATE: pagano SOLO il forfettario stagionale
     if (!unit.is_inhabited) {
-      const forfait = unit.monthly_gas_fixed || 0;
-      console.log(`   ⚠️ Unit ${unit.unit_number}: Uninhabited, pays ONLY €${forfait.toFixed(2)} forfait`);
+      const forfait = unit.monthly_gas_fixed > 0 ? unit.monthly_gas_fixed : forfaitPerUnit;
+      console.log(`      ⚠️ Uninhabited unit: pays ONLY €${forfait.toFixed(2)} forfait (${season})`);
 
       results[unit.unit_id] = {
-        heating: forfait * 0.1,  // Split 10% heating, 90% hot water for display purposes
-        hot_water: forfait * 0.9
+        heating: forfait * 0.5,  // Split 50/50 for display
+        hot_water: forfait * 0.5
       };
       continue;
     }
 
     // UNITÀ ABITATE: partecipano alla ripartizione
 
-    // Quota involontaria: proporzionale alla superficie
-    let unitInvoluntary = 0;
-    if (totalInhabitedSurface > 0) {
-      unitInvoluntary = (adjustedGasInvoluntaryCost * unit.surface_area) / totalInhabitedSurface;
+    // Quota involontaria (proporzionale alla superficie)
+    const unitInvoluntary = totalInhabitedSurface > 0
+      ? (adjustedInvoluntaryCost * unit.surface_area) / totalInhabitedSurface
+      : 0;
+
+    console.log(`      Involuntary: €${adjustedInvoluntaryCost.toFixed(2)} × ${unit.surface_area.toFixed(2)}/${totalInhabitedSurface.toFixed(2)} = €${unitInvoluntary.toFixed(2)}`);
+
+    // Quota riscaldamento (proporzionale ai consumi riscaldamento)
+    let unitHeating = 0;
+    if (totalHeating > 0) {
+      unitHeating = (heatingCost * unit.heating) / totalHeating;
+      console.log(`      Heating: €${heatingCost.toFixed(2)} × ${unit.heating.toFixed(2)}/${totalHeating.toFixed(2)} = €${unitHeating.toFixed(2)}`);
     }
 
-    // Quota volontaria: proporzionale ai consumi ACS
-    let unitVoluntary = 0;
-    if (totalHotWaterConsumption > 0 && adjustedGasVoluntaryCost > 0) {
-      unitVoluntary = (adjustedGasVoluntaryCost * unit.hot_water) / totalHotWaterConsumption;
+    // Quota ACS (proporzionale ai consumi ACS)
+    let unitHotWater = 0;
+    if (totalHotWater > 0) {
+      unitHotWater = (hotWaterCost * unit.hot_water) / totalHotWater;
+      console.log(`      Hot Water: €${hotWaterCost.toFixed(2)} × ${unit.hot_water.toFixed(2)}/${totalHotWater.toFixed(2)} = €${unitHotWater.toFixed(2)}`);
     }
 
-    // Il metano va principalmente per ACS (acqua calda sanitaria)
-    // Una piccola parte può andare per integrazione riscaldamento
-    // Per semplicità consideriamo 90% ACS, 10% riscaldamento
-    const totalUnit = unitInvoluntary + unitVoluntary;
-
-    console.log(`   📍 Unit ${unit.unit_number}: Involuntary=€${unitInvoluntary.toFixed(2)}, Voluntary=€${unitVoluntary.toFixed(2)}, Total=€${totalUnit.toFixed(2)}`);
+    const totalUnit = unitInvoluntary + unitHeating + unitHotWater;
+    console.log(`      ➡️ TOTAL FOR UNIT: €${totalUnit.toFixed(2)}`);
 
     results[unit.unit_id] = {
-      heating: totalUnit * 0.1,
-      hot_water: totalUnit * 0.9
+      heating: unitInvoluntary * 0.1 + unitHeating, // Involuntaria va per il 10% al riscaldamento, il resto all'heating quota
+      hot_water: unitInvoluntary * 0.9 + unitHotWater // Involontaria va per il 90% all'ACS, il resto all'ACS quota
     };
   }
 
@@ -261,6 +348,18 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
   const voluntaryPct = parseFloat(settings.elec_voluntary_pct) / 100;
 
   console.log(`📊 Split: ${(involuntaryPct * 100).toFixed(0)}% involuntary / ${(voluntaryPct * 100).toFixed(0)}% voluntary`);
+
+  // STEP 1: Sottrai costi parti comuni
+  const commonAreasCost = parseFloat(settings.common_areas_elec_monthly || 0);
+  console.log(`🏢 Common areas cost: €${commonAreasCost.toFixed(2)}`);
+
+  let totalAfterCommonAreas = totalElecCost - commonAreasCost;
+
+  if (totalAfterCommonAreas < 0) {
+    throw new Error(`Errore: i costi parti comuni elettricità (€${commonAreasCost.toFixed(2)}) superano il totale bolletta (€${totalElecCost.toFixed(2)})`);
+  }
+
+  console.log(`💵 After common areas: €${totalElecCost.toFixed(2)} - €${commonAreasCost.toFixed(2)} = €${totalAfterCommonAreas.toFixed(2)}`);
 
   // Percentuali stagionali per la quota volontaria
   let heatingPct, hotWaterPct, coldWaterPct, coolingPct;
@@ -295,24 +394,31 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
   }
   console.log(`✅ Percentages verification passed (sum = 100%)`);
 
-  // CRITICAL: Unità "Abitati No" pagano un forfettario fisso e NON partecipano alla ripartizione
-  // 1. Sommare tutti i forfettari delle unità non abitate
-  // 2. Sottrarre dal totale bolletta
-  // 3. Distribuire il resto SOLO tra le unità abitate
+  // STEP 2: Calcola forfait stagionali per unità non abitate
+  const forfaitPerUnit = season === 'summer'
+    ? parseFloat(settings.uninhabited_elec_summer_monthly || 0)
+    : parseFloat(settings.uninhabited_elec_winter_monthly || 0);
 
+  console.log(`💰 Seasonal forfait for uninhabited units (${season}): €${forfaitPerUnit.toFixed(2)}/unit`);
+
+  // Calcola forfait totale (unità non abitate possono avere override personalizzato)
   const uninhabitedForfait = consumptions
     .filter(u => !u.is_inhabited)
-    .reduce((sum, u) => sum + (u.monthly_elec_fixed || 0), 0);
+    .reduce((sum, u) => {
+      // Se l'unità ha un forfait personalizzato, usa quello, altrimenti usa il default stagionale
+      const unitForfait = u.monthly_elec_fixed > 0 ? u.monthly_elec_fixed : forfaitPerUnit;
+      return sum + unitForfait;
+    }, 0);
 
-  console.log(`\n💰 Uninhabited units forfait: €${uninhabitedForfait.toFixed(2)}`);
+  console.log(`\n💰 Total uninhabited units forfait: €${uninhabitedForfait.toFixed(2)}`);
 
-  const costToDistribute = totalElecCost - uninhabitedForfait;
+  const costToDistribute = totalAfterCommonAreas - uninhabitedForfait;
 
   if (costToDistribute < 0) {
-    throw new Error(`Errore: i forfettari delle unità non abitate (€${uninhabitedForfait.toFixed(2)}) superano il totale bolletta (€${totalElecCost.toFixed(2)})`);
+    throw new Error(`Errore: i forfettari delle unità non abitate (€${uninhabitedForfait.toFixed(2)}) superano il costo disponibile (€${totalAfterCommonAreas.toFixed(2)})`);
   }
 
-  console.log(`💵 Cost to distribute among inhabited units: €${totalElecCost.toFixed(2)} - €${uninhabitedForfait.toFixed(2)} = €${costToDistribute.toFixed(2)}`);
+  console.log(`💵 Cost to distribute among inhabited units: €${totalAfterCommonAreas.toFixed(2)} - €${uninhabitedForfait.toFixed(2)} = €${costToDistribute.toFixed(2)}`);
 
   // CRITICAL: Le percentuali stagionali sono SUL TOTALE, non sulla quota volontaria!
   // Quindi applico le percentuali direttamente a costToDistribute
@@ -417,10 +523,10 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
     console.log(`      Surface: ${unit.surface_area}m², inhabited: ${unit.is_inhabited}, commercial: ${unit.is_commercial}`);
     console.log(`      Consumptions: heating=${unit.heating.toFixed(2)}, hotWater=${unit.hot_water.toFixed(2)}, coldWater=${unit.cold_water.toFixed(2)}`);
 
-    // UNITÀ NON ABITATE: pagano SOLO il forfettario, NON partecipano alla ripartizione
+    // UNITÀ NON ABITATE: pagano SOLO il forfettario stagionale, NON partecipano alla ripartizione
     if (!unit.is_inhabited) {
-      const forfait = unit.monthly_elec_fixed || 0;
-      console.log(`      ⚠️ Uninhabited unit: pays ONLY €${forfait.toFixed(2)} forfait (does NOT participate in distribution)`);
+      const forfait = unit.monthly_elec_fixed > 0 ? unit.monthly_elec_fixed : forfaitPerUnit;
+      console.log(`      ⚠️ Uninhabited unit: pays ONLY €${forfait.toFixed(2)} forfait (${season}) - does NOT participate in distribution`);
 
       results[unit.unit_id] = {
         fixed: forfait,
@@ -590,16 +696,20 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
       throw new Error('Nessun dato di consumo trovato per il mese specificato');
     }
 
+    // Determina la stagione
+    const season = getSeason(monthNum, settings);
+    console.log(`🌡️ Season: ${season}`);
+
     // Ripartisci costi
     let gasCosts = {};
     let elecCosts = {};
 
     if (type === 'gas' || type === 'both') {
-      gasCosts = splitGasCosts(totalGasCost, consumptions, settings);
+      gasCosts = splitGasCosts(totalGasCost, consumptions, settings, season);
     }
 
     if (type === 'electricity' || type === 'both') {
-      elecCosts = splitElectricityCosts(totalElecCost, consumptions, settings, monthNum);
+      elecCosts = splitElectricityCosts(totalElecCost, consumptions, settings, season);
     }
 
     // Combina risultati
@@ -624,6 +734,7 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
           hot_water: unit.hot_water,
           cold_water: unit.cold_water
         },
+        readings: unit.readings || [], // Letture contabilizzatori
         costs: {
           gas_heating: gas.heating,
           gas_hot_water: gas.hot_water,
@@ -665,9 +776,27 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
         to: dateTo
       },
       type: type,
+      season: season,
       total_gas_cost: totalGasCost,
       total_elec_cost: totalElecCost,
       total_cost: totalGasCost + totalElecCost,
+      common_areas: {
+        gas: parseFloat(settings.common_areas_gas_monthly || 0),
+        electricity: parseFloat(settings.common_areas_elec_monthly || 0)
+      },
+      settings: {
+        gas_involuntary_pct: settings.gas_involuntary_pct,
+        gas_winter_heating_pct: settings.gas_winter_heating_pct,
+        gas_winter_hot_water_pct: settings.gas_winter_hot_water_pct,
+        gas_summer_hot_water_pct: settings.gas_summer_hot_water_pct,
+        elec_involuntary_pct: settings.elec_involuntary_pct,
+        winter_heating_pct: settings.winter_heating_pct,
+        winter_hot_water_pct: settings.winter_hot_water_pct,
+        winter_cold_water_pct: settings.winter_cold_water_pct,
+        summer_cooling_pct: settings.summer_cooling_pct,
+        summer_hot_water_pct: settings.summer_hot_water_pct,
+        summer_cold_water_pct: settings.summer_cold_water_pct
+      },
       units: results,
       verification: {
         expected_total: expectedTotal,

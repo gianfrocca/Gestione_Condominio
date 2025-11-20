@@ -307,20 +307,44 @@ export const initDatabase = async () => {
 
     // Inserisci impostazioni di default per il condominio 1
     const defaultSettings = [
-      ['gas_involuntary_pct', '40', 'Percentuale involontaria gas'],
-      ['gas_voluntary_pct', '60', 'Percentuale volontaria gas'],
+      // Costi Parti Comuni
+      ['common_areas_gas_monthly', '50', 'Costo parti comuni gas mensile (€/mese) - es. caldaia condominiale'],
+      ['common_areas_elec_monthly', '80', 'Costo parti comuni elettricità mensile (€/mese) - es. luci scale, ascensore'],
+
+      // Forfait Unità Non Abitate - INVERNO
+      ['uninhabited_gas_winter_monthly', '30', 'Forfait gas inverno per unità non abitate (€/mese)'],
+      ['uninhabited_elec_winter_monthly', '40', 'Forfait elettricità inverno per unità non abitate (€/mese)'],
+
+      // Forfait Unità Non Abitate - ESTATE
+      ['uninhabited_gas_summer_monthly', '15', 'Forfait gas estate per unità non abitate (€/mese)'],
+      ['uninhabited_elec_summer_monthly', '25', 'Forfait elettricità estate per unità non abitate (€/mese)'],
+
+      // Percentuali GAS (stagionali)
+      ['gas_involuntary_pct', '40', 'Percentuale involontaria gas (applicata sia in inverno che in estate)'],
+      ['gas_winter_heating_pct', '40', 'Percentuale riscaldamento gas inverno (sul totale bolletta)'],
+      ['gas_winter_hot_water_pct', '20', 'Percentuale ACS gas inverno (sul totale bolletta)'],
+      ['gas_summer_hot_water_pct', '60', 'Percentuale ACS gas estate (sul totale bolletta)'],
+
+      // Percentuali ELETTRICITÀ (non cambiano, rimosse gas_voluntary_pct e elec_voluntary_pct obsolete)
       ['elec_involuntary_pct', '40', 'Percentuale involontaria elettricità'],
-      ['elec_voluntary_pct', '60', 'Percentuale volontaria elettricità'],
+
+      // Stagionalità (mesi)
       ['summer_start_month', '6', 'Mese inizio estate (1-12)'],
       ['summer_end_month', '9', 'Mese fine estate (1-12)'],
+
+      // Percentuali ELETTRICITÀ - ESTATE
       ['summer_cooling_pct', '20', 'Percentuale raffrescamento estate (sul totale bolletta)'],
       ['summer_hot_water_pct', '20', 'Percentuale ACS estate (sul totale bolletta)'],
       ['summer_cold_water_pct', '20', 'Percentuale ACF estate (sul totale bolletta)'],
+
+      // Percentuali ELETTRICITÀ - INVERNO
       ['winter_heating_pct', '30', 'Percentuale riscaldamento inverno (sul totale bolletta)'],
       ['winter_hot_water_pct', '20', 'Percentuale ACS inverno (sul totale bolletta)'],
       ['winter_cold_water_pct', '10', 'Percentuale ACF inverno (sul totale bolletta)'],
-      ['staircase_lights_cost', '2', 'Costo forfettario luci scale (€/mese)'],
-      ['commercial_water_fixed', '5', 'Quota fissa commerciale acqua (€/mese)']
+
+      // LEGACY (da rimuovere se non usati)
+      ['staircase_lights_cost', '2', 'LEGACY - Costo forfettario luci scale (€/mese) - usa common_areas_elec_monthly'],
+      ['commercial_water_fixed', '5', 'LEGACY - Quota fissa commerciale acqua (€/mese)']
     ];
 
     for (const [key, value, description] of defaultSettings) {
