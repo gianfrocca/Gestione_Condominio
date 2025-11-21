@@ -1,12 +1,15 @@
 import express from 'express';
 import { calculateMonthlySplit } from '../utils/calculator.js';
 import { allQuery, runQuery } from '../database.js';
-import { getDebugCalculation } from '../controllers/debugController.js';
+import { getDebugCalculation, runCalculationTests } from '../controllers/debugController.js';
 
 const router = express.Router();
 
 // GET: Debug calculation - dettaglio completo dei calcoli (solo admin)
 router.get('/debug', getDebugCalculation);
+
+// POST: Esegui test di verifica logica calcoli (solo admin)
+router.post('/debug/run-tests', runCalculationTests);
 
 // POST: Calcola ripartizione per un periodo personalizzato
 router.post('/calculate', async (req, res) => {

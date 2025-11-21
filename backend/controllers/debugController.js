@@ -1,5 +1,62 @@
 import { calculateMonthlySplit } from '../utils/calculator.js';
 import { allQuery, getQuery } from '../database.js';
+import { execSync } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Esegue lo script di test delle logiche di calcolo
+ * Solo per amministratori
+ */
+export const runCalculationTests = async (req, res) => {
+  try {
+    // Verifica che l'utente sia admin o super_admin
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+      return res.status(403).json({ error: 'Solo gli amministratori possono eseguire i test' });
+    }
+
+    console.log(`\n🧪 TEST EXECUTION REQUEST from user: ${req.user.username}`);
+
+    // Percorso dello script di test
+    const testScriptPath = path.join(__dirname, '..', 'test-calculations.js');
+
+    try {
+      // Esegui lo script di test e cattura l'output
+      const output = execSync(`node "${testScriptPath}"`, {
+        encoding: 'utf-8',
+        cwd: path.join(__dirname, '..'),
+        timeout: 30000 // 30 secondi timeout
+      });
+
+      // I test sono passati (exit code 0)
+      res.json({
+        success: true,
+        output: output,
+        message: 'Tutti i test sono passati con successo!'
+      });
+
+    } catch (error) {
+      // I test sono falliti (exit code != 0) o timeout
+      res.json({
+        success: false,
+        output: error.stdout || error.stderr || error.message,
+        message: 'Alcuni test sono falliti',
+        error: error.message
+      });
+    }
+
+  } catch (error) {
+    console.error('Errore esecuzione test:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Errore durante l\'esecuzione dei test',
+      details: error.message
+    });
+  }
+};
 
 /**
  * Debug endpoint - fornisce dettaglio completo dei calcoli
