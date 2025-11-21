@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Bug, Search, CheckCircle, XCircle, AlertCircle, Play } from 'lucide-react';
-import axios from 'axios';
+import { calculationsAPI } from '../services/api';
 import { format } from 'date-fns';
 
 function DebugCalculations() {
@@ -19,12 +19,8 @@ function DebugCalculations() {
   const handleDebug = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:3000/api/calculations/debug`, {
-        params: { dateFrom, dateTo, type: calculationType },
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setDebugData(response.data);
+      const { data } = await calculationsAPI.getDebug(dateFrom, dateTo, calculationType);
+      setDebugData(data);
     } catch (error) {
       console.error('Errore debug:', error);
       alert('Errore durante il debug: ' + (error.response?.data?.error || error.message));
@@ -37,13 +33,8 @@ function DebugCalculations() {
     try {
       setRunningTests(true);
       setTestResults(null);
-      const token = localStorage.getItem('token');
-      const response = await axios.post(
-        `http://localhost:3000/api/calculations/debug/run-tests`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setTestResults(response.data);
+      const { data } = await calculationsAPI.runTests();
+      setTestResults(data);
     } catch (error) {
       console.error('Errore esecuzione test:', error);
       setTestResults({

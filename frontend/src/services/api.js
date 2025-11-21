@@ -99,6 +99,9 @@ export const calculationsAPI = {
   getHistory: (params) => api.get('/calculations/history', { params }),
   getAnnualSummary: (year) => api.get(`/calculations/annual-summary/${year}`),
   getMonthlyStats: (month) => api.get(`/calculations/monthly-stats/${month}`),
+  // Debug API
+  getDebug: (dateFrom, dateTo, type = 'both') => api.get('/calculations/debug', { params: { dateFrom, dateTo, type } }),
+  runTests: () => api.post('/calculations/debug/run-tests'),
 };
 
 // Settings API
