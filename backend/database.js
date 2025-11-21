@@ -334,7 +334,7 @@ export const initDatabase = async () => {
       ['common_areas_elec_monthly', '80', 'Costo parti comuni elettricità mensile (€/mese) - es. ascensore, cancello automatico'],
 
       // Luci Scale
-      ['staircase_lights_monthly', '60', 'Costo totale luci scale mensile (€/mese) - diviso tra unità con luci scale abilitate'],
+      ['staircase_lights_monthly', '2', 'Costo luci scale per unità mensile (€/unità/mese) - ogni unità con luci paga questo importo'],
 
       // Percentuali GAS (stagionali)
       ['gas_involuntary_pct', '40', 'Percentuale involontaria gas (applicata sia in inverno che in estate)'],

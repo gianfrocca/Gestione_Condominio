@@ -119,7 +119,7 @@ async function calculateConsumptions(dateFrom, dateTo) {
         consumptions[unit.id].readings.push({
           meter_id: unit.meter_id,
           meter_type: unit.meter_type,
-          meter_code: unit.meter_code || 'N/A',
+          meter_code: unit.meter_code || '-',
           start_value: startReading.value,
           start_date: startReading.reading_date,
           end_value: finalEndReading.value,
@@ -362,18 +362,18 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
 
   console.log(`💵 After common areas: €${totalElecCost.toFixed(2)} - €${commonAreasCost.toFixed(2)} = €${totalAfterCommonAreas.toFixed(2)}`);
 
-  // STEP 2: Sottrai luci scale e dividile EQUAMENTE tra chi le ha (abitato=Si, luci_scale=Si)
-  const staircaseLightsTotal = parseFloat(settings.staircase_lights_monthly || 0);
+  // STEP 2: Sottrai luci scale - OGNI unità con luci paga l'importo dalle impostazioni
+  const staircaseLightsCostPerUnit = parseFloat(settings.staircase_lights_monthly || 0);
   const unitsWithLights = consumptions.filter(u => u.has_staircase_lights && u.is_inhabited);
   const numUnitsWithLights = unitsWithLights.length;
-  const staircaseLightsCostPerUnit = numUnitsWithLights > 0 ? staircaseLightsTotal / numUnitsWithLights : 0;
+  const staircaseLightsTotal = staircaseLightsCostPerUnit * numUnitsWithLights;
 
   let totalAfterLights = totalAfterCommonAreas - staircaseLightsTotal;
 
   console.log(`\n💡 Staircase lights:`);
-  console.log(`   Total cost: €${staircaseLightsTotal.toFixed(2)}`);
+  console.log(`   Cost per unit (from settings): €${staircaseLightsCostPerUnit.toFixed(2)}`);
   console.log(`   Units with lights (inhabited): ${numUnitsWithLights}`);
-  console.log(`   Cost per unit: €${staircaseLightsCostPerUnit.toFixed(2)}`);
+  console.log(`   Total cost (${numUnitsWithLights} × €${staircaseLightsCostPerUnit.toFixed(2)}): €${staircaseLightsTotal.toFixed(2)}`);
   console.log(`   After lights: €${totalAfterLights.toFixed(2)}`);
 
   // STEP 3: Sottrai forfait acqua commerciali (solo per commerciali abitati)

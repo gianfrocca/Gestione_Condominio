@@ -174,14 +174,10 @@ export async function generateMonthlyReport(data, outputPath) {
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown(1);
 
-      // Dettaglio per unità
-      let isFirstUnit = true;
+      // Dettaglio per unità - OGNI unità su nuova pagina (anche la prima)
       for (const unit of data.units) {
-        // Nuova pagina per ogni unità (tranne la prima)
-        if (!isFirstUnit) {
-          doc.addPage();
-        }
-        isFirstUnit = false;
+        // Nuova pagina per ogni unità (compresa la prima)
+        doc.addPage();
 
         doc.fontSize(12).font('Helvetica-Bold');
         doc.text(`${unit.unit_number} - ${unit.unit_name}`, { underline: true });
