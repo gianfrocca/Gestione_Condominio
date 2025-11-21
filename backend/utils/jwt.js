@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 
 // Secret key per JWT - in produzione dovrebbe essere in variabile d'ambiente
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
-const JWT_EXPIRES_IN = '24h'; // Token valido per 24 ore
+const JWT_EXPIRES_IN = '15m'; // Token valido per 15 minuti (logout automatico per inattività)
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token valido per 7 giorni
 
 /**

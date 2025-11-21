@@ -248,27 +248,55 @@ function splitGasCosts(totalGasCost, consumptions, settings, season, numMonths =
   console.log(`   - Heating: ${totalHeating.toFixed(2)} kWh`);
   console.log(`   - Hot Water: ${totalHotWater.toFixed(2)} m³`);
 
-  // STEP 5: Gestione categorie con ZERO consumi
-  let redistributedCost = 0;
+  // STEP 5: Redistribuzione CORRETTA delle percentuali (GAS)
+  // Se una categoria volontaria ha zero consumi, redistribuisce PROPORZIONALMENTE
+  // solo tra le altre categorie VOLONTARIE (NON alla involontaria!)
 
-  console.log(`\n🔄 Checking for categories with zero consumption...`);
+  console.log(`\n🔄 Checking for voluntary categories with zero consumption...`);
 
-  if (totalHeating === 0 && heatingPct > 0) {
-    console.log(`   ⚠️ Zero heating consumption. Redistributing €${heatingCost.toFixed(2)} to fixed quota`);
-    redistributedCost += heatingCost;
-  }
+  // Identifica categorie volontarie con zero consumi
+  const voluntaryCategories = [
+    { name: 'heating', pct: heatingPct, total: totalHeating, cost: heatingCost },
+    { name: 'hotWater', pct: hotWaterPct, total: totalHotWater, cost: hotWaterCost }
+  ];
 
-  if (totalHotWater === 0 && hotWaterPct > 0) {
-    console.log(`   ⚠️ Zero hot water consumption. Redistributing €${hotWaterCost.toFixed(2)} to fixed quota`);
-    redistributedCost += hotWaterCost;
-  }
+  // Calcola percentuale totale da redistribuire e percentuale attiva
+  let pctToRedistribute = 0;
+  let activePctSum = 0;
 
-  const adjustedInvoluntaryCost = involuntaryCost + redistributedCost;
+  voluntaryCategories.forEach(cat => {
+    if (cat.total === 0 && cat.pct > 0) {
+      console.log(`   ⚠️ ${cat.name}: zero consumption, redistributing ${(cat.pct * 100).toFixed(0)}%`);
+      pctToRedistribute += cat.pct;
+    } else if (cat.total > 0) {
+      activePctSum += cat.pct;
+    }
+  });
 
-  console.log(`\n💡 Final involuntary cost calculation:`);
-  console.log(`   Base involuntary: €${involuntaryCost.toFixed(2)}`);
-  console.log(`   + Redistributed (from zero-consumption categories): €${redistributedCost.toFixed(2)}`);
-  console.log(`   = Adjusted involuntary: €${adjustedInvoluntaryCost.toFixed(2)}`);
+  // Ricalcola percentuali aggiustate per categorie attive
+  const adjustedHeatingPct = totalHeating > 0 && activePctSum > 0
+    ? heatingPct + (pctToRedistribute * heatingPct / activePctSum)
+    : (totalHeating > 0 ? heatingPct : 0);
+
+  const adjustedHotWaterPct = totalHotWater > 0 && activePctSum > 0
+    ? hotWaterPct + (pctToRedistribute * hotWaterPct / activePctSum)
+    : (totalHotWater > 0 ? hotWaterPct : 0);
+
+  console.log(`\n💡 Adjusted percentages after redistribution:`);
+  console.log(`   Involuntary: ${(involuntaryPct * 100).toFixed(1)}% (unchanged)`);
+  console.log(`   Heating: ${(heatingPct * 100).toFixed(1)}% → ${(adjustedHeatingPct * 100).toFixed(1)}%`);
+  console.log(`   Hot Water: ${(hotWaterPct * 100).toFixed(1)}% → ${(adjustedHotWaterPct * 100).toFixed(1)}%`);
+
+  // Ricalcola i costi con le percentuali aggiustate
+  const adjustedInvoluntaryCost = involuntaryCost; // Resta invariata!
+  const adjustedHeatingCost = costToDistribute * adjustedHeatingPct;
+  const adjustedHotWaterCost = costToDistribute * adjustedHotWaterPct;
+
+  console.log(`\n💰 Adjusted cost allocation:`);
+  console.log(`   Involuntary: €${adjustedInvoluntaryCost.toFixed(2)} (unchanged)`);
+  console.log(`   Heating: €${adjustedHeatingCost.toFixed(2)}`);
+  console.log(`   Hot Water: €${adjustedHotWaterCost.toFixed(2)}`);
+  console.log(`   SUM: €${(adjustedInvoluntaryCost + adjustedHeatingCost + adjustedHotWaterCost).toFixed(2)} (should be €${costToDistribute.toFixed(2)})`);
 
   // STEP 6: Distribuzione alle unità
   const results = {};
@@ -309,18 +337,18 @@ function splitGasCosts(totalGasCost, consumptions, settings, season, numMonths =
 
     console.log(`      Involuntary: €${adjustedInvoluntaryCost.toFixed(2)} × ${unit.surface_area.toFixed(2)}/${totalInhabitedSurface.toFixed(2)} = €${unitInvoluntary.toFixed(2)}`);
 
-    // Quota riscaldamento (proporzionale ai consumi riscaldamento)
+    // Quota riscaldamento (proporzionale ai consumi riscaldamento) - USA COSTO AGGIUSTATO
     let unitHeating = 0;
     if (totalHeating > 0) {
-      unitHeating = (heatingCost * unit.heating) / totalHeating;
-      console.log(`      Heating: €${heatingCost.toFixed(2)} × ${unit.heating.toFixed(2)}/${totalHeating.toFixed(2)} = €${unitHeating.toFixed(2)}`);
+      unitHeating = (adjustedHeatingCost * unit.heating) / totalHeating;
+      console.log(`      Heating: €${adjustedHeatingCost.toFixed(2)} × ${unit.heating.toFixed(2)}/${totalHeating.toFixed(2)} = €${unitHeating.toFixed(2)}`);
     }
 
-    // Quota ACS (proporzionale ai consumi ACS)
+    // Quota ACS (proporzionale ai consumi ACS) - USA COSTO AGGIUSTATO
     let unitHotWater = 0;
     if (totalHotWater > 0) {
-      unitHotWater = (hotWaterCost * unit.hot_water) / totalHotWater;
-      console.log(`      Hot Water: €${hotWaterCost.toFixed(2)} × ${unit.hot_water.toFixed(2)}/${totalHotWater.toFixed(2)} = €${unitHotWater.toFixed(2)}`);
+      unitHotWater = (adjustedHotWaterCost * unit.hot_water) / totalHotWater;
+      console.log(`      Hot Water: €${adjustedHotWaterCost.toFixed(2)} × ${unit.hot_water.toFixed(2)}/${totalHotWater.toFixed(2)} = €${unitHotWater.toFixed(2)}`);
     }
 
     const totalUnit = unitInvoluntary + unitHeating + unitHotWater;
@@ -511,35 +539,71 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month, num
   console.log(`   - Involuntary: €${involuntaryCost.toFixed(2)}`);
   console.log(`   - SUM: €${(involuntaryCost + heatingCost + coolingCost + hotWaterCost + coldWaterCost).toFixed(2)} (should be €${costToDistribute.toFixed(2)})`);
 
-  // CRITICAL FIX: Se una categoria ha ZERO consumi totali, quella quota
-  // deve essere ripartita comunque (altrimenti si perde denaro!)
-  // Strategia: aggiungerla alla quota involontaria (ripartita per superficie)
-  let redistributedCost = 0;
+  // CRITICAL FIX: Redistribuzione CORRETTA delle percentuali
+  // Se una categoria volontaria ha zero consumi, redistribuisce PROPORZIONALMENTE
+  // solo tra le altre categorie VOLONTARIE (NON alla involontaria!)
 
-  console.log(`\n🔄 Checking for categories with zero consumption...`);
+  console.log(`\n🔄 Checking for voluntary categories with zero consumption...`);
 
-  if (totalHeating === 0 && heatingPct > 0) {
-    console.log(`   ⚠️ Zero heating consumption. Redistributing €${heatingCost.toFixed(2)} to fixed quota`);
-    redistributedCost += heatingCost;
-  }
+  // Identifica categorie volontarie con zero consumi
+  const voluntaryCategories = [
+    { name: 'heating', pct: heatingPct, total: totalHeating, cost: heatingCost },
+    { name: 'cooling', pct: coolingPct, total: 0, cost: coolingCost }, // cooling usa stesso meter di heating
+    { name: 'hotWater', pct: hotWaterPct, total: totalHotWater, cost: hotWaterCost },
+    { name: 'coldWater', pct: coldWaterPct, total: totalColdWater, cost: coldWaterCost }
+  ];
 
-  if (totalHotWater === 0 && hotWaterPct > 0) {
-    console.log(`   ⚠️ Zero hot water consumption. Redistributing €${hotWaterCost.toFixed(2)} to fixed quota`);
-    redistributedCost += hotWaterCost;
-  }
+  // Calcola percentuale totale da redistribuire e percentuale attiva
+  let pctToRedistribute = 0;
+  let activePctSum = 0;
 
-  if (totalColdWater === 0 && coldWaterPct > 0) {
-    console.log(`   ⚠️ Zero cold water consumption. Redistributing €${coldWaterCost.toFixed(2)} to fixed quota`);
-    redistributedCost += coldWaterCost;
-  }
+  voluntaryCategories.forEach(cat => {
+    if (cat.total === 0 && cat.pct > 0) {
+      console.log(`   ⚠️ ${cat.name}: zero consumption, redistributing ${(cat.pct * 100).toFixed(0)}%`);
+      pctToRedistribute += cat.pct;
+    } else if (cat.total > 0) {
+      activePctSum += cat.pct;
+    }
+  });
 
-  // Aggiungi quota redistribuita alla involontaria
-  const adjustedInvoluntaryCost = involuntaryCost + redistributedCost;
+  // Ricalcola percentuali aggiustate per categorie attive
+  const adjustedHeatingPct = totalHeating > 0 && activePctSum > 0
+    ? heatingPct + (pctToRedistribute * heatingPct / activePctSum)
+    : (totalHeating > 0 ? heatingPct : 0);
 
-  console.log(`\n💡 Final involuntary cost calculation:`);
-  console.log(`   Base involuntary: €${involuntaryCost.toFixed(2)}`);
-  console.log(`   + Redistributed (from zero-consumption categories): €${redistributedCost.toFixed(2)}`);
-  console.log(`   = Adjusted involuntary: €${adjustedInvoluntaryCost.toFixed(2)}`);
+  const adjustedCoolingPct = totalHeating > 0 && activePctSum > 0
+    ? coolingPct + (pctToRedistribute * coolingPct / activePctSum)
+    : (totalHeating > 0 ? coolingPct : 0);
+
+  const adjustedHotWaterPct = totalHotWater > 0 && activePctSum > 0
+    ? hotWaterPct + (pctToRedistribute * hotWaterPct / activePctSum)
+    : (totalHotWater > 0 ? hotWaterPct : 0);
+
+  const adjustedColdWaterPct = totalColdWater > 0 && activePctSum > 0
+    ? coldWaterPct + (pctToRedistribute * coldWaterPct / activePctSum)
+    : (totalColdWater > 0 ? coldWaterPct : 0);
+
+  console.log(`\n💡 Adjusted percentages after redistribution:`);
+  console.log(`   Involuntary: ${(involuntaryPct * 100).toFixed(1)}% (unchanged)`);
+  console.log(`   Heating: ${(heatingPct * 100).toFixed(1)}% → ${(adjustedHeatingPct * 100).toFixed(1)}%`);
+  console.log(`   Cooling: ${(coolingPct * 100).toFixed(1)}% → ${(adjustedCoolingPct * 100).toFixed(1)}%`);
+  console.log(`   Hot Water: ${(hotWaterPct * 100).toFixed(1)}% → ${(adjustedHotWaterPct * 100).toFixed(1)}%`);
+  console.log(`   Cold Water: ${(coldWaterPct * 100).toFixed(1)}% → ${(adjustedColdWaterPct * 100).toFixed(1)}%`);
+
+  // Ricalcola i costi con le percentuali aggiustate
+  const adjustedInvoluntaryCost = involuntaryCost; // Resta invariata!
+  const adjustedHeatingCost = costToDistribute * adjustedHeatingPct;
+  const adjustedCoolingCost = costToDistribute * adjustedCoolingPct;
+  const adjustedHotWaterCost = costToDistribute * adjustedHotWaterPct;
+  const adjustedColdWaterCost = costToDistribute * adjustedColdWaterPct;
+
+  console.log(`\n💰 Adjusted cost allocation:`);
+  console.log(`   Involuntary: €${adjustedInvoluntaryCost.toFixed(2)} (unchanged)`);
+  console.log(`   Heating: €${adjustedHeatingCost.toFixed(2)}`);
+  console.log(`   Cooling: €${adjustedCoolingCost.toFixed(2)}`);
+  console.log(`   Hot Water: €${adjustedHotWaterCost.toFixed(2)}`);
+  console.log(`   Cold Water: €${adjustedColdWaterCost.toFixed(2)}`);
+  console.log(`   SUM: €${(adjustedInvoluntaryCost + adjustedHeatingCost + adjustedCoolingCost + adjustedHotWaterCost + adjustedColdWaterCost).toFixed(2)} (should be €${costToDistribute.toFixed(2)})`);
 
   const results = {};
 
@@ -591,38 +655,38 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month, num
     }
     totalDistributedInvoluntary += unitInvoluntary;
 
-    // Quota volontaria riscaldamento (solo residenziali)
+    // Quota volontaria riscaldamento (solo residenziali) - USA COSTO AGGIUSTATO
     let unitHeating = 0;
     if (!unit.is_commercial && totalHeating > 0) {
-      unitHeating = (heatingCost * unit.heating) / totalHeating;
-      console.log(`      Heating: €${heatingCost.toFixed(2)} × ${unit.heating.toFixed(2)}/${totalHeating.toFixed(2)} = €${unitHeating.toFixed(2)}`);
+      unitHeating = (adjustedHeatingCost * unit.heating) / totalHeating;
+      console.log(`      Heating: €${adjustedHeatingCost.toFixed(2)} × ${unit.heating.toFixed(2)}/${totalHeating.toFixed(2)} = €${unitHeating.toFixed(2)}`);
       totalDistributedHeating += unitHeating;
     }
 
-    // Quota volontaria raffrescamento (solo residenziali)
+    // Quota volontaria raffrescamento (solo residenziali) - USA COSTO AGGIUSTATO
     let unitCooling = 0;
     if (!unit.is_commercial && totalHeating > 0) { // Uso stesso contabilizzatore
-      unitCooling = (coolingCost * unit.heating) / totalHeating;
-      if (coolingCost > 0) {
-        console.log(`      Cooling: €${coolingCost.toFixed(2)} × ${unit.heating.toFixed(2)}/${totalHeating.toFixed(2)} = €${unitCooling.toFixed(2)}`);
+      unitCooling = (adjustedCoolingCost * unit.heating) / totalHeating;
+      if (adjustedCoolingCost > 0) {
+        console.log(`      Cooling: €${adjustedCoolingCost.toFixed(2)} × ${unit.heating.toFixed(2)}/${totalHeating.toFixed(2)} = €${unitCooling.toFixed(2)}`);
       }
       totalDistributedCooling += unitCooling;
     }
 
-    // Quota volontaria ACS (solo residenziali)
+    // Quota volontaria ACS (solo residenziali) - USA COSTO AGGIUSTATO
     let unitHotWater = 0;
     if (!unit.is_commercial && totalHotWater > 0) {
-      unitHotWater = (hotWaterCost * unit.hot_water) / totalHotWater;
-      console.log(`      Hot water: €${hotWaterCost.toFixed(2)} × ${unit.hot_water.toFixed(2)}/${totalHotWater.toFixed(2)} = €${unitHotWater.toFixed(2)}`);
+      unitHotWater = (adjustedHotWaterCost * unit.hot_water) / totalHotWater;
+      console.log(`      Hot water: €${adjustedHotWaterCost.toFixed(2)} × ${unit.hot_water.toFixed(2)}/${totalHotWater.toFixed(2)} = €${unitHotWater.toFixed(2)}`);
       totalDistributedHotWater += unitHotWater;
     }
 
-    // Quota volontaria ACF (tutti, anche commerciale)
+    // Quota volontaria ACF (tutti, anche commerciale) - USA COSTO AGGIUSTATO
     let unitColdWater = 0;
     if (totalColdWater > 0) {
-      unitColdWater = (coldWaterCost * unit.cold_water) / totalColdWater;
+      unitColdWater = (adjustedColdWaterCost * unit.cold_water) / totalColdWater;
       if (unit.cold_water > 0) {
-        console.log(`      Cold water: €${coldWaterCost.toFixed(2)} × ${unit.cold_water.toFixed(2)}/${totalColdWater.toFixed(2)} = €${unitColdWater.toFixed(2)}`);
+        console.log(`      Cold water: €${adjustedColdWaterCost.toFixed(2)} × ${unit.cold_water.toFixed(2)}/${totalColdWater.toFixed(2)} = €${unitColdWater.toFixed(2)}`);
       }
       totalDistributedColdWater += unitColdWater;
     }
