@@ -155,15 +155,18 @@ async function calculateConsumptions(dateFrom, dateTo) {
  * @param {array} consumptions - Array consumi per unità
  * @param {object} settings - Impostazioni
  * @param {string} season - Stagione ('summer' o 'winter')
+ * @param {number} numMonths - Numero di mesi nel periodo
  * @returns {object} Costi per unità
  */
-function splitGasCosts(totalGasCost, consumptions, settings, season) {
+function splitGasCosts(totalGasCost, consumptions, settings, season, numMonths = 1) {
   console.log(`\n🔥 ========== GAS COST SPLIT (${season.toUpperCase()}) ==========`);
   console.log(`💰 Total gas cost: €${totalGasCost.toFixed(2)}`);
+  console.log(`📆 Period: ${numMonths} month(s)`);
 
-  // STEP 1: Sottrai costi parti comuni
-  const commonAreasCost = parseFloat(settings.common_areas_gas_monthly || 0);
-  console.log(`🏢 Common areas cost: €${commonAreasCost.toFixed(2)}`);
+  // STEP 1: Sottrai costi parti comuni (moltiplicati per numero mesi)
+  const commonAreasCostMonthly = parseFloat(settings.common_areas_gas_monthly || 0);
+  const commonAreasCost = commonAreasCostMonthly * numMonths;
+  console.log(`🏢 Common areas cost: €${commonAreasCostMonthly.toFixed(2)}/month × ${numMonths} = €${commonAreasCost.toFixed(2)}`);
 
   let totalAfterCommonAreas = totalGasCost - commonAreasCost;
 
@@ -173,18 +176,18 @@ function splitGasCosts(totalGasCost, consumptions, settings, season) {
 
   console.log(`💵 After common areas: €${totalGasCost.toFixed(2)} - €${commonAreasCost.toFixed(2)} = €${totalAfterCommonAreas.toFixed(2)}`);
 
-  // STEP 2: Calcola forfait stagionali per unità non abitate
+  // STEP 2: Calcola forfait stagionali per unità non abitate (moltiplicati per numero mesi)
   // Ora i forfait sono SOLO nelle unità (non più default in settings)
   const uninhabitedForfait = consumptions
     .filter(u => !u.is_inhabited)
     .reduce((sum, u) => {
-      const unitForfait = season === 'summer'
+      const unitForfaitMonthly = season === 'summer'
         ? (u.monthly_gas_fixed_summer || 0)
         : (u.monthly_gas_fixed_winter || 0);
-      return sum + unitForfait;
+      return sum + (unitForfaitMonthly * numMonths);
     }, 0);
 
-  console.log(`💰 Total uninhabited units forfait (${season}): €${uninhabitedForfait.toFixed(2)}`);
+  console.log(`💰 Total uninhabited units forfait (${season}): €${(uninhabitedForfait / numMonths).toFixed(2)}/month × ${numMonths} = €${uninhabitedForfait.toFixed(2)}`);
 
   const costToDistribute = totalAfterCommonAreas - uninhabitedForfait;
 
@@ -282,12 +285,13 @@ function splitGasCosts(totalGasCost, consumptions, settings, season) {
       continue;
     }
 
-    // UNITÀ NON ABITATE: pagano SOLO il forfettario stagionale
+    // UNITÀ NON ABITATE: pagano SOLO il forfettario stagionale (moltiplicato per mesi)
     if (!unit.is_inhabited) {
-      const forfait = season === 'summer'
+      const forfaitMonthly = season === 'summer'
         ? (unit.monthly_gas_fixed_summer || 0)
         : (unit.monthly_gas_fixed_winter || 0);
-      console.log(`      ⚠️ Uninhabited unit: pays ONLY €${forfait.toFixed(2)} forfait (${season})`);
+      const forfait = forfaitMonthly * numMonths;
+      console.log(`      ⚠️ Uninhabited unit: pays ONLY €${forfaitMonthly.toFixed(2)}/month × ${numMonths} = €${forfait.toFixed(2)} forfait (${season})`);
 
       results[unit.unit_id] = {
         heating: forfait * 0.5,  // Split 50/50 for display
@@ -337,22 +341,25 @@ function splitGasCosts(totalGasCost, consumptions, settings, season) {
  * @param {array} consumptions - Array consumi per unità
  * @param {object} settings - Impostazioni
  * @param {number} month - Mese (1-12)
+ * @param {number} numMonths - Numero di mesi nel periodo
  * @returns {object} Costi per unità
  */
-function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
+function splitElectricityCosts(totalElecCost, consumptions, settings, month, numMonths = 1) {
   const season = getSeason(month, settings);
 
   console.log(`\n⚡ ========== ELECTRICITY COST SPLIT (${season.toUpperCase()}) ==========`);
   console.log(`💰 Total electricity cost: €${totalElecCost.toFixed(2)}`);
+  console.log(`📆 Period: ${numMonths} month(s)`);
 
   const involuntaryPct = parseFloat(settings.elec_involuntary_pct) / 100;
   const voluntaryPct = parseFloat(settings.elec_voluntary_pct) / 100;
 
   console.log(`📊 Split: ${(involuntaryPct * 100).toFixed(0)}% involuntary / ${(voluntaryPct * 100).toFixed(0)}% voluntary`);
 
-  // STEP 1: Sottrai costi parti comuni
-  const commonAreasCost = parseFloat(settings.common_areas_elec_monthly || 0);
-  console.log(`🏢 Common areas cost: €${commonAreasCost.toFixed(2)}`);
+  // STEP 1: Sottrai costi parti comuni (moltiplicati per numero mesi)
+  const commonAreasCostMonthly = parseFloat(settings.common_areas_elec_monthly || 0);
+  const commonAreasCost = commonAreasCostMonthly * numMonths;
+  console.log(`🏢 Common areas cost: €${commonAreasCostMonthly.toFixed(2)}/month × ${numMonths} = €${commonAreasCost.toFixed(2)}`);
 
   let totalAfterCommonAreas = totalElecCost - commonAreasCost;
 
@@ -362,8 +369,9 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
 
   console.log(`💵 After common areas: €${totalElecCost.toFixed(2)} - €${commonAreasCost.toFixed(2)} = €${totalAfterCommonAreas.toFixed(2)}`);
 
-  // STEP 2: Sottrai luci scale - OGNI unità con luci paga l'importo dalle impostazioni
-  const staircaseLightsCostPerUnit = parseFloat(settings.staircase_lights_monthly || 0);
+  // STEP 2: Sottrai luci scale - OGNI unità con luci paga l'importo dalle impostazioni (moltiplicato per mesi)
+  const staircaseLightsCostPerUnitMonthly = parseFloat(settings.staircase_lights_monthly || 0);
+  const staircaseLightsCostPerUnit = staircaseLightsCostPerUnitMonthly * numMonths;
   const unitsWithLights = consumptions.filter(u => u.has_staircase_lights && u.is_inhabited);
   const numUnitsWithLights = unitsWithLights.length;
   const staircaseLightsTotal = staircaseLightsCostPerUnit * numUnitsWithLights;
@@ -371,15 +379,15 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
   let totalAfterLights = totalAfterCommonAreas - staircaseLightsTotal;
 
   console.log(`\n💡 Staircase lights:`);
-  console.log(`   Cost per unit (from settings): €${staircaseLightsCostPerUnit.toFixed(2)}`);
+  console.log(`   Cost per unit: €${staircaseLightsCostPerUnitMonthly.toFixed(2)}/month × ${numMonths} = €${staircaseLightsCostPerUnit.toFixed(2)}`);
   console.log(`   Units with lights (inhabited): ${numUnitsWithLights}`);
   console.log(`   Total cost (${numUnitsWithLights} × €${staircaseLightsCostPerUnit.toFixed(2)}): €${staircaseLightsTotal.toFixed(2)}`);
   console.log(`   After lights: €${totalAfterLights.toFixed(2)}`);
 
-  // STEP 3: Sottrai forfait acqua commerciali (solo per commerciali abitati)
+  // STEP 3: Sottrai forfait acqua commerciali (solo per commerciali abitati, moltiplicato per mesi)
   const commercialWaterForfait = consumptions
     .filter(u => u.is_commercial && u.is_inhabited)
-    .reduce((sum, u) => sum + (u.monthly_water_fixed || 0), 0);
+    .reduce((sum, u) => sum + (u.monthly_water_fixed || 0) * numMonths, 0);
 
   let totalAfterCommercialWater = totalAfterLights - commercialWaterForfait;
 
@@ -420,18 +428,18 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
   }
   console.log(`✅ Percentages verification passed (sum = 100%)`);
 
-  // STEP 4: Calcola forfait stagionali per unità non abitate
+  // STEP 4: Calcola forfait stagionali per unità non abitate (moltiplicato per mesi)
   // Ora i forfait sono SOLO nelle unità (non più default in settings)
   const uninhabitedForfait = consumptions
     .filter(u => !u.is_inhabited)
     .reduce((sum, u) => {
-      const unitForfait = season === 'summer'
+      const unitForfaitMonthly = season === 'summer'
         ? (u.monthly_elec_fixed_summer || 0)
         : (u.monthly_elec_fixed_winter || 0);
-      return sum + unitForfait;
+      return sum + (unitForfaitMonthly * numMonths);
     }, 0);
 
-  console.log(`\n💰 Total uninhabited units forfait (${season}): €${uninhabitedForfait.toFixed(2)}`);
+  console.log(`\n💰 Total uninhabited units forfait (${season}): €${(uninhabitedForfait / numMonths).toFixed(2)}/month × ${numMonths} = €${uninhabitedForfait.toFixed(2)}`);
 
   const costToDistribute = totalAfterCommercialWater - uninhabitedForfait;
 
@@ -548,12 +556,13 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
     console.log(`      Surface: ${unit.surface_area}m², inhabited: ${unit.is_inhabited}, commercial: ${unit.is_commercial}`);
     console.log(`      Consumptions: heating=${unit.heating.toFixed(2)}, hotWater=${unit.hot_water.toFixed(2)}, coldWater=${unit.cold_water.toFixed(2)}`);
 
-    // UNITÀ NON ABITATE: pagano SOLO il forfettario stagionale, NON partecipano alla ripartizione
+    // UNITÀ NON ABITATE: pagano SOLO il forfettario stagionale (moltiplicato per mesi), NON partecipano alla ripartizione
     if (!unit.is_inhabited) {
-      const forfait = season === 'summer'
+      const forfaitMonthly = season === 'summer'
         ? (unit.monthly_elec_fixed_summer || 0)
         : (unit.monthly_elec_fixed_winter || 0);
-      console.log(`      ⚠️ Uninhabited unit: pays ONLY €${forfait.toFixed(2)} forfait (${season}) - does NOT participate in distribution`);
+      const forfait = forfaitMonthly * numMonths;
+      console.log(`      ⚠️ Uninhabited unit: pays ONLY €${forfaitMonthly.toFixed(2)}/month × ${numMonths} = €${forfait.toFixed(2)} forfait (${season}) - does NOT participate in distribution`);
 
       results[unit.unit_id] = {
         staircase_lights: 0,
@@ -618,11 +627,11 @@ function splitElectricityCosts(totalElecCost, consumptions, settings, month) {
       totalDistributedColdWater += unitColdWater;
     }
 
-    // Calcola staircase lights per questa unità
+    // Calcola staircase lights per questa unità (già moltiplicato per mesi in staircaseLightsCostPerUnit)
     const unitStaircaseLights = unit.has_staircase_lights ? staircaseLightsCostPerUnit : 0;
 
-    // Calcola commercial water forfait per questa unità
-    const unitCommercialWater = (unit.is_commercial && unit.is_inhabited) ? (unit.monthly_water_fixed || 0) : 0;
+    // Calcola commercial water forfait per questa unità (moltiplicato per mesi)
+    const unitCommercialWater = (unit.is_commercial && unit.is_inhabited) ? (unit.monthly_water_fixed || 0) * numMonths : 0;
 
     const unitTotal = unitStaircaseLights + unitCommercialWater + unitInvoluntary + unitHeating + unitCooling + unitHotWater + unitColdWater;
     console.log(`      ➡️ TOTAL FOR UNIT: €${unitTotal.toFixed(2)}`);
@@ -699,7 +708,14 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
     const midDate = new Date((startDate.getTime() + endDate.getTime()) / 2);
     const monthNum = midDate.getMonth() + 1; // 1-12
 
+    // CRITICAL: Calcola numero di mesi nel periodo per i costi mensili fissi
+    // I costi mensili (parti comuni, luci scale, forfait) vanno moltiplicati per i mesi
+    const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12
+                     + (endDate.getMonth() - startDate.getMonth()) + 1;
+    const numMonths = Math.max(1, monthsDiff); // Almeno 1 mese
+
     console.log(`🌡️ Season calculation based on month: ${monthNum}`);
+    console.log(`📆 Number of months in period: ${numMonths}`);
 
     // Somma bollette nel periodo (per tipo)
     let totalGasCost = 0;
@@ -753,11 +769,11 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
     let elecCosts = {};
 
     if (type === 'gas' || type === 'both') {
-      gasCosts = splitGasCosts(totalGasCost, consumptions, settings, season);
+      gasCosts = splitGasCosts(totalGasCost, consumptions, settings, season, numMonths);
     }
 
     if (type === 'electricity' || type === 'both') {
-      elecCosts = splitElectricityCosts(totalElecCost, consumptions, settings, season);
+      elecCosts = splitElectricityCosts(totalElecCost, consumptions, settings, monthNum, numMonths);
     }
 
     // Combina risultati
