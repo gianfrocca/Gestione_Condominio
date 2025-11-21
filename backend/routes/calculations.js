@@ -2,8 +2,12 @@ import express from 'express';
 import { calculateMonthlySplit } from '../utils/calculator.js';
 import { allQuery, runQuery } from '../database.js';
 import { getDebugCalculation, runCalculationTests } from '../controllers/debugController.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Tutte le route richiedono autenticazione
+router.use(authenticate);
 
 // GET: Debug calculation - dettaglio completo dei calcoli (solo admin)
 router.get('/debug', getDebugCalculation);
