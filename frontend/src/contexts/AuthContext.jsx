@@ -192,7 +192,8 @@ export const AuthProvider = ({ children }) => {
       reports: ['super_admin', 'admin', 'gestore', 'inquilino'],
       payments: ['super_admin', 'admin', 'gestore', 'inquilino'],
       settings: ['super_admin', 'admin'],
-      users: ['super_admin', 'admin']
+      users: ['super_admin', 'admin'],
+      debug: ['super_admin', 'admin']
     };
 
     return permissions[section]?.includes(user.role) || false;

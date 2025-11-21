@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
-import { Home, FileText, Settings as SettingsIcon, BarChart3, Menu, X, DollarSign, Users, LogOut, User } from 'lucide-react';
+import { Home, FileText, Settings as SettingsIcon, BarChart3, Menu, X, DollarSign, Users, LogOut, User, Bug } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -10,6 +10,7 @@ import Reports from './components/Reports';
 import Payments from './components/Payments';
 import Settings from './components/Settings';
 import UserManagement from './components/UserManagement';
+import DebugCalculations from './components/DebugCalculations';
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -44,6 +45,7 @@ function MainLayout() {
     { id: 'payments', path: '/payments', name: 'Pagamenti', icon: DollarSign, section: 'payments' },
     { id: 'users', path: '/users', name: 'Utenti', icon: Users, section: 'users' },
     { id: 'settings', path: '/settings', name: 'Impostazioni', icon: SettingsIcon, section: 'settings' },
+    { id: 'debug', path: '/debug', name: 'Debug Calcoli', icon: Bug, section: 'debug' },
   ];
 
   // Filter navigation based on user permissions
@@ -158,6 +160,7 @@ function MainLayout() {
             <Route path="/payments" element={<Payments />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/debug" element={<DebugCalculations />} />
           </Routes>
         </main>
       </div>
