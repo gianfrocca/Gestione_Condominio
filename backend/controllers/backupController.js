@@ -1,61 +1,67 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
-import fsSync from 'fs';
-import sqlite3 from 'sqlite3';
-import { allQuery } from '../database.js';
+import { allQuery, runQuery, pool } from '../database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// IMPORTANT: Usa lo stesso percorso di database.js
-const dbPath = path.join(__dirname, '..', '..', 'data', 'condominio.db');
-
 /**
- * Esporta il database come SQL dump
+ * Esporta il database come SQL dump (PostgreSQL)
  */
 export const exportSQL = async (req, res) => {
   try {
     let sqlDump = `-- Gestione Condominio Database Backup
 -- Generated: ${new Date().toISOString()}
--- SQLite version 3
+-- PostgreSQL Database Dump
 
-BEGIN TRANSACTION;
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET row_security = off;
+
+BEGIN;
 
 `;
 
-    // Ottieni tutte le tabelle usando allQuery
+    // Ottieni tutte le tabelle usando PostgreSQL information_schema
     const tables = await allQuery(
-      "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public'
+       AND table_type = 'BASE TABLE'
+       ORDER BY table_name`
     );
 
     console.log(`📦 Exporting ${tables.length} tables...`);
 
     // Processa ogni tabella sequenzialmente
-    for (const table of tables) {
-      console.log(`  Exporting table: ${table.name}`);
+    for (const tableRow of tables) {
+      const tableName = tableRow.table_name;
+      console.log(`  Exporting table: ${tableName}`);
 
-      sqlDump += `-- Table: ${table.name}\n`;
-      sqlDump += `DROP TABLE IF EXISTS ${table.name};\n`;
-      sqlDump += `${table.sql};\n\n`;
-
-      // Ottieni tutti i dati della tabella
-      const rows = await allQuery(`SELECT * FROM ${table.name}`);
+      // Ottieni tutte i dati della tabella
+      const rows = await allQuery(`SELECT * FROM "${tableName}"`);
 
       if (rows.length > 0) {
         console.log(`    ${rows.length} rows`);
+        const columns = Object.keys(rows[0]);
+
         for (const row of rows) {
-          const columns = Object.keys(row);
           const values = columns.map(col => {
             const val = row[col];
             if (val === null) return 'NULL';
             if (typeof val === 'number') return val;
-            if (typeof val === 'boolean') return val ? 1 : 0;
+            if (typeof val === 'boolean') return val ? 'true' : 'false';
+            if (val instanceof Date) return `'${val.toISOString()}'`;
             // Escape single quotes for SQL
             return `'${String(val).replace(/'/g, "''")}'`;
           });
 
-          sqlDump += `INSERT INTO ${table.name} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
+          sqlDump += `INSERT INTO "${tableName}" (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${values.join(', ')});\n`;
         }
         sqlDump += '\n';
       }
@@ -80,11 +86,9 @@ BEGIN TRANSACTION;
 };
 
 /**
- * Importa un database da SQL dump
+ * Importa un database da SQL dump (PostgreSQL)
  */
 export const importSQL = async (req, res) => {
-  let backupPath = null;
-
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nessun file fornito' });
@@ -94,55 +98,11 @@ export const importSQL = async (req, res) => {
     const sqlContent = req.file.buffer.toString('utf-8');
     console.log(`   File size: ${sqlContent.length} bytes`);
 
-    // Backup del database corrente
-    backupPath = path.join(__dirname, '..', '..', 'data', `condominio.backup.${Date.now()}.db`);
-
-    // Verifica che il database esista prima di fare il backup
-    if (!fsSync.existsSync(dbPath)) {
-      return res.status(500).json({
-        error: 'Database non trovato',
-        details: `Il file ${dbPath} non esiste`
-      });
-    }
-
-    console.log('💾 Creating backup...');
-    await fs.copyFile(dbPath, backupPath);
-    console.log(`   Backup created at: ${backupPath}`);
-
-    // Crea nuova connessione per l'import
+    // Esegui il contenuto SQL
     console.log('🔄 Importing SQL...');
-
-    await new Promise((resolve, reject) => {
-      const db = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        // Esegui il contenuto SQL
-        db.exec(sqlContent, (execErr) => {
-          if (execErr) {
-            console.error('❌ SQL execution error:', execErr);
-            db.close();
-            reject(execErr);
-            return;
-          }
-
-          db.close((closeErr) => {
-            if (closeErr) {
-              console.error('⚠️ Error closing database:', closeErr);
-            }
-            resolve();
-          });
-        });
-      });
-    });
+    await pool.query(sqlContent);
 
     console.log('✅ Import completed successfully');
-
-    // Rimuovi il backup temporaneo se tutto ok
-    await fs.unlink(backupPath);
-    console.log('🗑️ Temporary backup removed');
 
     res.json({
       success: true,
@@ -151,19 +111,6 @@ export const importSQL = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Errore import SQL:', error);
-
-    // Ripristina il backup in caso di errore
-    if (backupPath && fsSync.existsSync(backupPath)) {
-      try {
-        console.log('⏮️ Restoring backup...');
-        await fs.copyFile(backupPath, dbPath);
-        await fs.unlink(backupPath);
-        console.log('✅ Backup restored successfully');
-      } catch (restoreErr) {
-        console.error('❌ Failed to restore backup:', restoreErr);
-      }
-    }
-
     res.status(500).json({
       error: 'Errore durante l\'import del database',
       details: error.message
@@ -172,36 +119,61 @@ export const importSQL = async (req, res) => {
 };
 
 /**
- * Scarica una copia binaria del database SQLite
+ * Esporta dump in formato pg_dump (disponibile se accesso a server PostgreSQL)
  */
-export const downloadDatabase = async (req, res) => {
+export const exportPGDump = async (req, res) => {
   try {
-    console.log('📦 Downloading database binary...');
+    console.log('📦 Preparing PostgreSQL dump...');
 
-    if (!fsSync.existsSync(dbPath)) {
-      return res.status(500).json({
-        error: 'Database non trovato',
-        details: `Il file ${dbPath} non esiste`
-      });
+    // Genera un dump testuale di tutti i dati
+    let dump = `-- PostgreSQL Database Dump
+-- Generated: ${new Date().toISOString()}
+
+`;
+
+    // Ottieni tutte le tabelle
+    const tables = await allQuery(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public'
+       AND table_type = 'BASE TABLE'
+       ORDER BY table_name`
+    );
+
+    for (const tableRow of tables) {
+      const tableName = tableRow.table_name;
+      const rows = await allQuery(`SELECT * FROM "${tableName}"`);
+
+      dump += `-- Table: ${tableName}\n`;
+      dump += `-- Records: ${rows.length}\n\n`;
+
+      if (rows.length > 0) {
+        const columns = Object.keys(rows[0]);
+        dump += `COPY "${tableName}" (${columns.map(c => `"${c}"`).join(', ')}) FROM stdin;\n`;
+
+        for (const row of rows) {
+          const values = columns.map(col => {
+            const val = row[col];
+            if (val === null) return '\\N';
+            if (typeof val === 'boolean') return val ? 't' : 'f';
+            if (val instanceof Date) return val.toISOString();
+            return String(val).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\t/g, '\\t');
+          });
+          dump += values.join('\t') + '\n';
+        }
+        dump += '\\.\n\n';
+      }
     }
 
-    res.download(dbPath, `database_${Date.now()}.sqlite`, (err) => {
-      if (err) {
-        console.error('❌ Errore download database:', err);
-        if (!res.headersSent) {
-          res.status(500).json({
-            error: 'Errore durante il download del database',
-            details: err.message
-          });
-        }
-      } else {
-        console.log('✅ Database download completed');
-      }
-    });
+    console.log('✅ PostgreSQL dump prepared');
+
+    res.setHeader('Content-Type', 'application/sql; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=dump_${Date.now()}.sql`);
+    res.send(dump);
+
   } catch (error) {
-    console.error('❌ Errore download database:', error);
+    console.error('❌ Errore preparazione dump:', error);
     res.status(500).json({
-      error: 'Errore durante il download del database',
+      error: 'Errore durante la preparazione del dump',
       details: error.message
     });
   }
