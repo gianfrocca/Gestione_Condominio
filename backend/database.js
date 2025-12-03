@@ -1,47 +1,58 @@
-import sqlite3 from 'sqlite3';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import pg from 'pg';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const { Pool } = pg;
 
-const dbPath = join(__dirname, '..', 'data', 'condominio.db');
+// Configurazione connessione PostgreSQL da variabili di ambiente
+const pool = new Pool({
+  user: process.env.DB_USER || 'condominio_user',
+  password: process.env.DB_PASSWORD || 'password',
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'condominio_db',
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+});
 
-// Crea connessione al database
-const db = new sqlite3.Database(dbPath, (err) => {
+pool.on('error', (err) => {
+  console.error('Errore pool connessione PostgreSQL:', err.message);
+});
+
+// Connessione test
+pool.query('SELECT NOW()', (err, res) => {
   if (err) {
-    console.error('Errore connessione database:', err.message);
+    console.error('❌ Errore connessione database:', err.message);
   } else {
-    console.log('✅ Connesso al database SQLite');
+    console.log('✅ Connesso al database PostgreSQL');
   }
 });
 
-// Funzione per eseguire query con Promise
-export const runQuery = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve({ id: this.lastID, changes: this.changes });
-    });
-  });
+// Funzione per eseguire query con Promise (compatibile con pg)
+export const runQuery = async (sql, params = []) => {
+  try {
+    const result = await pool.query(sql, params);
+    // PostgreSQL: per INSERT con RETURNING id, il valore è in result.rows[0].id
+    const id = result.rows.length > 0 && result.rows[0].id ? result.rows[0].id : null;
+    return { id, changes: result.rowCount };
+  } catch (err) {
+    throw err;
+  }
 };
 
-export const getQuery = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
+export const getQuery = async (sql, params = []) => {
+  try {
+    const result = await pool.query(sql, params);
+    return result.rows.length > 0 ? result.rows[0] : undefined;
+  } catch (err) {
+    throw err;
+  }
 };
 
-export const allQuery = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+export const allQuery = async (sql, params = []) => {
+  try {
+    const result = await pool.query(sql, params);
+    return result.rows;
+  } catch (err) {
+    throw err;
+  }
 };
 
 // Inizializza lo schema del database
@@ -54,15 +65,15 @@ export const initDatabase = async () => {
     // ============================================
     await runQuery(`
       CREATE TABLE IF NOT EXISTS condominiums (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         address TEXT,
         city TEXT,
         zip_code TEXT,
         tax_code TEXT,
         notes TEXT,
-        is_active BOOLEAN DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     console.log('  ✅ Tabella condominiums');
@@ -72,8 +83,8 @@ export const initDatabase = async () => {
     // ============================================
     await runQuery(`
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        condominium_id INTEGER,
+        id SERIAL PRIMARY KEY,
+        condominium_id INTEGER REFERENCES condominiums(id),
         username TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         email TEXT NOT NULL,
@@ -81,11 +92,9 @@ export const initDatabase = async () => {
         unit_id INTEGER,
         full_name TEXT,
         phone TEXT,
-        is_active BOOLEAN DEFAULT 1,
-        last_login DATETIME,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (condominium_id) REFERENCES condominiums(id),
-        FOREIGN KEY (unit_id) REFERENCES units(id)
+        is_active BOOLEAN DEFAULT true,
+        last_login TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     console.log('  ✅ Tabella users');
@@ -95,75 +104,39 @@ export const initDatabase = async () => {
     // ============================================
     await runQuery(`
       CREATE TABLE IF NOT EXISTS units (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        condominium_id INTEGER NOT NULL DEFAULT 1,
+        id SERIAL PRIMARY KEY,
+        condominium_id INTEGER NOT NULL DEFAULT 1 REFERENCES condominiums(id),
         number TEXT NOT NULL,
         name TEXT NOT NULL,
-        surface_area REAL NOT NULL,
-        is_inhabited BOOLEAN DEFAULT 1,
-        is_commercial BOOLEAN DEFAULT 0,
-        has_staircase_lights BOOLEAN DEFAULT 0,
-        monthly_water_fixed REAL DEFAULT 0,
-        monthly_elec_fixed_winter REAL DEFAULT 0,
-        monthly_elec_fixed_summer REAL DEFAULT 0,
-        monthly_gas_fixed_winter REAL DEFAULT 0,
-        monthly_gas_fixed_summer REAL DEFAULT 0,
+        surface_area DECIMAL NOT NULL,
+        is_inhabited BOOLEAN DEFAULT true,
+        is_commercial BOOLEAN DEFAULT false,
+        has_staircase_lights BOOLEAN DEFAULT false,
+        monthly_water_fixed DECIMAL DEFAULT 0,
+        monthly_elec_fixed_winter DECIMAL DEFAULT 0,
+        monthly_elec_fixed_summer DECIMAL DEFAULT 0,
+        monthly_gas_fixed_winter DECIMAL DEFAULT 0,
+        monthly_gas_fixed_summer DECIMAL DEFAULT 0,
         foglio TEXT,
         particella TEXT,
         sub TEXT,
         notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (condominium_id) REFERENCES condominiums(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(condominium_id, number)
       )
     `);
-
     console.log('  ✅ Tabella units');
-
-    // Aggiungi colonne se non esistono (per database esistenti)
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN condominium_id INTEGER NOT NULL DEFAULT 1`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN foglio TEXT`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN particella TEXT`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN sub TEXT`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN has_staircase_lights BOOLEAN DEFAULT 0`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN monthly_water_fixed REAL DEFAULT 0`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN monthly_elec_fixed_winter REAL DEFAULT 0`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN monthly_elec_fixed_summer REAL DEFAULT 0`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN monthly_gas_fixed_winter REAL DEFAULT 0`);
-    } catch (e) { /* già esistente */ }
-    try {
-      await runQuery(`ALTER TABLE units ADD COLUMN monthly_gas_fixed_summer REAL DEFAULT 0`);
-    } catch (e) { /* già esistente */ }
 
     // ============================================
     // TABELLA CONTABILIZZATORI
     // ============================================
-    // Tabella Contabilizzatori
     await runQuery(`
       CREATE TABLE IF NOT EXISTS meters (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        unit_id INTEGER NOT NULL,
+        id SERIAL PRIMARY KEY,
+        unit_id INTEGER NOT NULL REFERENCES units(id) ON DELETE CASCADE,
         type TEXT NOT NULL,
         meter_code TEXT,
         description TEXT,
-        FOREIGN KEY (unit_id) REFERENCES units(id),
         UNIQUE(unit_id, type)
       )
     `);
@@ -171,13 +144,12 @@ export const initDatabase = async () => {
     // Tabella Letture
     await runQuery(`
       CREATE TABLE IF NOT EXISTS readings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        meter_id INTEGER NOT NULL,
+        id SERIAL PRIMARY KEY,
+        meter_id INTEGER NOT NULL REFERENCES meters(id) ON DELETE CASCADE,
         reading_date DATE NOT NULL,
-        value REAL NOT NULL,
+        value DECIMAL NOT NULL,
         notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (meter_id) REFERENCES meters(id)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -186,26 +158,20 @@ export const initDatabase = async () => {
     // ============================================
     await runQuery(`
       CREATE TABLE IF NOT EXISTS bills (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        condominium_id INTEGER NOT NULL DEFAULT 1,
+        id SERIAL PRIMARY KEY,
+        condominium_id INTEGER NOT NULL DEFAULT 1 REFERENCES condominiums(id),
         bill_date DATE NOT NULL,
         type TEXT NOT NULL,
-        amount REAL NOT NULL,
+        amount DECIMAL NOT NULL,
         provider TEXT,
         bill_period_start DATE,
         bill_period_end DATE,
         file_path TEXT,
         notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (condominium_id) REFERENCES condominiums(id)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     console.log('  ✅ Tabella bills');
-
-    // Aggiungi condominium_id se non esiste
-    try {
-      await runQuery(`ALTER TABLE bills ADD COLUMN condominium_id INTEGER NOT NULL DEFAULT 1`);
-    } catch (e) { /* già esistente */ }
 
     // ============================================
     // TABELLA IMPOSTAZIONI
@@ -213,31 +179,24 @@ export const initDatabase = async () => {
     await runQuery(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT NOT NULL,
-        condominium_id INTEGER NOT NULL DEFAULT 1,
+        condominium_id INTEGER NOT NULL DEFAULT 1 REFERENCES condominiums(id),
         value TEXT NOT NULL,
         description TEXT,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (key, condominium_id),
-        FOREIGN KEY (condominium_id) REFERENCES condominiums(id)
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (key, condominium_id)
       )
     `);
     console.log('  ✅ Tabella settings');
 
-    // Aggiungi condominium_id se non esiste (per database esistenti)
-    try {
-      await runQuery(`ALTER TABLE settings ADD COLUMN condominium_id INTEGER NOT NULL DEFAULT 1`);
-    } catch (e) { /* già esistente */ }
-
     // Tabella Costi Fissi
     await runQuery(`
       CREATE TABLE IF NOT EXISTS fixed_costs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        unit_id INTEGER,
+        id SERIAL PRIMARY KEY,
+        unit_id INTEGER REFERENCES units(id) ON DELETE CASCADE,
         type TEXT NOT NULL,
-        amount REAL NOT NULL,
+        amount DECIMAL NOT NULL,
         description TEXT,
-        is_active BOOLEAN DEFAULT 1,
-        FOREIGN KEY (unit_id) REFERENCES units(id)
+        is_active BOOLEAN DEFAULT true
       )
     `);
 
@@ -246,56 +205,42 @@ export const initDatabase = async () => {
     // ============================================
     await runQuery(`
       CREATE TABLE IF NOT EXISTS monthly_splits (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        condominium_id INTEGER NOT NULL DEFAULT 1,
+        id SERIAL PRIMARY KEY,
+        condominium_id INTEGER NOT NULL DEFAULT 1 REFERENCES condominiums(id),
         month DATE NOT NULL,
-        unit_id INTEGER NOT NULL,
-        cost_gas_heating REAL DEFAULT 0,
-        cost_gas_hot_water REAL DEFAULT 0,
-        cost_elec_heating REAL DEFAULT 0,
-        cost_elec_hot_water REAL DEFAULT 0,
-        cost_elec_cooling REAL DEFAULT 0,
-        cost_elec_cold_water REAL DEFAULT 0,
-        cost_elec_fixed REAL DEFAULT 0,
-        total_cost REAL DEFAULT 0,
+        unit_id INTEGER NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+        cost_gas_heating DECIMAL DEFAULT 0,
+        cost_gas_hot_water DECIMAL DEFAULT 0,
+        cost_elec_heating DECIMAL DEFAULT 0,
+        cost_elec_hot_water DECIMAL DEFAULT 0,
+        cost_elec_cooling DECIMAL DEFAULT 0,
+        cost_elec_cold_water DECIMAL DEFAULT 0,
+        cost_elec_fixed DECIMAL DEFAULT 0,
+        total_cost DECIMAL DEFAULT 0,
         notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (condominium_id) REFERENCES condominiums(id),
-        FOREIGN KEY (unit_id) REFERENCES units(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(month, unit_id)
       )
     `);
     console.log('  ✅ Tabella monthly_splits');
-
-    // Aggiungi condominium_id se non esiste
-    try {
-      await runQuery(`ALTER TABLE monthly_splits ADD COLUMN condominium_id INTEGER NOT NULL DEFAULT 1`);
-    } catch (e) { /* già esistente */ }
 
     // ============================================
     // TABELLA PAGAMENTI
     // ============================================
     await runQuery(`
       CREATE TABLE IF NOT EXISTS payments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        condominium_id INTEGER NOT NULL DEFAULT 1,
-        unit_id INTEGER NOT NULL,
+        id SERIAL PRIMARY KEY,
+        condominium_id INTEGER NOT NULL DEFAULT 1 REFERENCES condominiums(id),
+        unit_id INTEGER NOT NULL REFERENCES units(id) ON DELETE CASCADE,
         payment_date DATE NOT NULL,
-        amount REAL NOT NULL,
+        amount DECIMAL NOT NULL,
         payment_type TEXT,
         reference_month DATE,
         notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (condominium_id) REFERENCES condominiums(id),
-        FOREIGN KEY (unit_id) REFERENCES units(id)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     console.log('  ✅ Tabella payments');
-
-    // Aggiungi condominium_id se non esiste
-    try {
-      await runQuery(`ALTER TABLE payments ADD COLUMN condominium_id INTEGER NOT NULL DEFAULT 1`);
-    } catch (e) { /* già esistente */ }
 
     // ============================================
     // DATI DI DEFAULT
@@ -362,7 +307,9 @@ export const initDatabase = async () => {
 
     for (const [key, value, description] of defaultSettings) {
       await runQuery(
-        `INSERT OR IGNORE INTO settings (key, condominium_id, value, description) VALUES (?, 1, ?, ?)`,
+        `INSERT INTO settings (key, condominium_id, value, description)
+         VALUES ($1, 1, $2, $3)
+         ON CONFLICT (key, condominium_id) DO NOTHING`,
         [key, value, description]
       );
     }
@@ -375,4 +322,4 @@ export const initDatabase = async () => {
   }
 };
 
-export default db;
+export { pool };
