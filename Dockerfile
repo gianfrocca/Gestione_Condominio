@@ -1,24 +1,33 @@
-# Dockerfile ultra-semplice per Railway
-FROM node:18
+# Build stage
+FROM node:18 AS builder
 
 WORKDIR /app
 
-# Copia tutto
 COPY . .
 
-# Installa backend
+# Installa tutte le dipendenze (incluse devDependencies per build)
 WORKDIR /app/backend
-RUN npm install --production
+RUN npm install
 
-# Installa e builda frontend
 WORKDIR /app/frontend
 RUN npm install && npm run build
 
-# Torna alla root
+# Runtime stage
+FROM node:18-slim
+
 WORKDIR /app
 
-# Esponi porta
+# Copia i file compilati dal builder
+COPY --from=builder /app/backend ./backend
+COPY --from=builder /app/frontend/dist ./frontend/dist
+COPY --from=builder /app/package.json ./package.json
+
+# Rimuovi i devDependencies dai node_modules già copiati
+WORKDIR /app/backend
+RUN npm prune --omit=dev
+
+WORKDIR /app
+
 EXPOSE 3000
 
-# Avvia
 CMD ["node", "backend/server.js"]
