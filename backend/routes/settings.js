@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 // GET: Ottieni singola impostazione
 router.get('/:key', async (req, res) => {
   try {
-    const setting = await getQuery('SELECT * FROM settings WHERE key = $1', [req.params.key]);
+    const setting = await getQuery('SELECT * FROM settings WHERE key = ?', [req.params.key]);
     if (!setting) {
       return res.status(404).json({ error: 'Impostazione non trovata' });
     }
@@ -32,11 +32,11 @@ router.put('/:key', async (req, res) => {
     const { value, description } = req.body;
 
     await runQuery(
-      `UPDATE settings SET value = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE key = $3`,
+      `UPDATE settings SET value = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?`,
       [value, description, req.params.key]
     );
 
-    const updated = await getQuery('SELECT * FROM settings WHERE key = $1', [req.params.key]);
+    const updated = await getQuery('SELECT * FROM settings WHERE key = ?', [req.params.key]);
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -49,11 +49,11 @@ router.post('/', async (req, res) => {
     const { key, value, description } = req.body;
 
     await runQuery(
-      `INSERT INTO settings (key, value, description) VALUES ($1, $2, $3)`,
+      `INSERT INTO settings (key, value, description) VALUES (?, ?, ?)`,
       [key, value, description || null]
     );
 
-    const newSetting = await getQuery('SELECT * FROM settings WHERE key = $1', [key]);
+    const newSetting = await getQuery('SELECT * FROM settings WHERE key = ?', [key]);
     res.status(201).json(newSetting);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -71,7 +71,7 @@ router.put('/', async (req, res) => {
 
     for (const setting of settings) {
       await runQuery(
-        `UPDATE settings SET value = $1, updated_at = CURRENT_TIMESTAMP WHERE key = $2`,
+        `UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?`,
         [setting.value, setting.key]
       );
     }

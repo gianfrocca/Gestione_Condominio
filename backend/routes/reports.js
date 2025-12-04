@@ -64,7 +64,7 @@ router.get('/annual/:year', async (req, res) => {
          COUNT(*) as months_count
        FROM monthly_splits ms
        JOIN units u ON ms.unit_id = u.id
-       WHERE strftime("%Y", ms.month) = $1
+       WHERE strftime("%Y", ms.month) = ?
        GROUP BY ms.unit_id, u.number, u.name
        ORDER BY u.number`,
       [year]
