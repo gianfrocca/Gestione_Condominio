@@ -17,17 +17,17 @@ router.get('/', async (req, res) => {
     const params = [];
 
     if (unit_id) {
-      sql += ' AND p.unit_id = ?';
+      sql += ' AND p.unit_id = $1';
       params.push(unit_id);
     }
 
     if (start_date) {
-      sql += ' AND p.payment_date >= ?';
+      sql += ' AND p.payment_date >= $1';
       params.push(start_date);
     }
 
     if (end_date) {
-      sql += ' AND p.payment_date <= ?';
+      sql += ' AND p.payment_date <= $1';
       params.push(end_date);
     }
 
@@ -48,7 +48,7 @@ router.get('/:id', async (req, res) => {
       `SELECT p.*, u.number as unit_number, u.name as unit_name
        FROM payments p
        JOIN units u ON p.unit_id = u.id
-       WHERE p.id = ?`,
+       WHERE p.id = $1`,
       [req.params.id]
     );
 
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
 
     const result = await runQuery(
       `INSERT INTO payments (unit_id, payment_date, amount, payment_type, reference_month, notes)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [unit_id, payment_date, amount, payment_type || null, reference_month || null, notes || null]
     );
 
@@ -84,7 +84,7 @@ router.post('/', async (req, res) => {
       `SELECT p.*, u.number as unit_number, u.name as unit_name
        FROM payments p
        JOIN units u ON p.unit_id = u.id
-       WHERE p.id = ?`,
+       WHERE p.id = $1`,
       [result.id]
     );
 
@@ -102,9 +102,9 @@ router.put('/:id', async (req, res) => {
 
     await runQuery(
       `UPDATE payments
-       SET unit_id = ?, payment_date = ?, amount = ?, payment_type = ?,
-           reference_month = ?, notes = ?
-       WHERE id = ?`,
+       SET unit_id = $1, payment_date = $2, amount = $3, payment_type = $4,
+           reference_month = $1, notes = $2
+       WHERE id = $1`,
       [unit_id, payment_date, amount, payment_type || null, reference_month || null, notes || null, req.params.id]
     );
 
@@ -112,7 +112,7 @@ router.put('/:id', async (req, res) => {
       `SELECT p.*, u.number as unit_number, u.name as unit_name
        FROM payments p
        JOIN units u ON p.unit_id = u.id
-       WHERE p.id = ?`,
+       WHERE p.id = $1`,
       [req.params.id]
     );
 
@@ -126,7 +126,7 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/payments/:id - Elimina pagamento
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await runQuery('DELETE FROM payments WHERE id = ?', [req.params.id]);
+    const result = await runQuery('DELETE FROM payments WHERE id = $1', [req.params.id]);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Pagamento non trovato' });
@@ -150,7 +150,7 @@ router.get('/summary-all', async (req, res) => {
         const paidResult = await getQuery(
           `SELECT COALESCE(SUM(amount), 0) as total_paid
            FROM payments
-           WHERE unit_id = ?`,
+           WHERE unit_id = $1`,
           [unit.id]
         );
 
@@ -158,12 +158,12 @@ router.get('/summary-all', async (req, res) => {
         const dueResult = await getQuery(
           `SELECT COALESCE(SUM(total_cost), 0) as total_due
            FROM monthly_splits
-           WHERE unit_id = ?`,
+           WHERE unit_id = $1`,
           [unit.id]
         );
 
-        const totalPaid = paidResult?.total_paid || 0;
-        const totalDue = dueResult?.total_due || 0;
+        const totalPaid = paidResult$1.total_paid || 0;
+        const totalDue = dueResult$1.total_due || 0;
         const balance = totalPaid - totalDue;
 
         return {
@@ -173,7 +173,7 @@ router.get('/summary-all', async (req, res) => {
           total_paid: totalPaid,
           total_due: totalDue,
           balance: balance,
-          status: balance >= 0 ? 'in_credito' : 'in_debito'
+          status: balance >= 0 $1 'in_credito' : 'in_debito'
         };
       })
     );
@@ -194,7 +194,7 @@ router.get('/summary/:unit_id', async (req, res) => {
     const paidResult = await getQuery(
       `SELECT COALESCE(SUM(amount), 0) as total_paid
        FROM payments
-       WHERE unit_id = ?`,
+       WHERE unit_id = $1`,
       [unit_id]
     );
 
@@ -202,12 +202,12 @@ router.get('/summary/:unit_id', async (req, res) => {
     const dueResult = await getQuery(
       `SELECT COALESCE(SUM(total_cost), 0) as total_due
        FROM monthly_splits
-       WHERE unit_id = ?`,
+       WHERE unit_id = $1`,
       [unit_id]
     );
 
-    const totalPaid = paidResult?.total_paid || 0;
-    const totalDue = dueResult?.total_due || 0;
+    const totalPaid = paidResult$1.total_paid || 0;
+    const totalDue = dueResult$1.total_due || 0;
     const balance = totalPaid - totalDue;
 
     res.json({
@@ -215,7 +215,7 @@ router.get('/summary/:unit_id', async (req, res) => {
       total_paid: totalPaid,
       total_due: totalDue,
       balance: balance,
-      status: balance >= 0 ? 'in_credito' : 'in_debito'
+      status: balance >= 0 $1 'in_credito' : 'in_debito'
     });
   } catch (error) {
     console.error('Error fetching payment summary:', error);
