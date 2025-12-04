@@ -16,14 +16,32 @@ pool.on('error', (err) => {
   console.error('Errore pool connessione PostgreSQL:', err.message);
 });
 
-// Connessione test
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('❌ Errore connessione database:', err.message);
-  } else {
-    console.log('✅ Connesso al database PostgreSQL');
+/**
+ * Attendi il database con retry automatico
+ * Utile quando il database container sta ancora avviandosi
+ */
+const waitForDatabase = async () => {
+  const MAX_RETRIES = 10;
+  const RETRY_DELAY = 2000; // 2 secondi tra i tentativi
+  let retries = 0;
+
+  while (retries < MAX_RETRIES) {
+    try {
+      await pool.query('SELECT NOW()');
+      console.log('✅ Connesso al database PostgreSQL');
+      return;
+    } catch (err) {
+      retries++;
+      if (retries < MAX_RETRIES) {
+        console.log(`⏳ Tentativo ${retries}/${MAX_RETRIES} - Database non ancora pronto, attendo ${RETRY_DELAY / 1000}s...`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY));
+      } else {
+        console.error('❌ Impossibile connettersi al database dopo 10 tentativi');
+        throw err;
+      }
+    }
   }
-});
+};
 
 // Funzione per eseguire query con Promise (compatibile con pg)
 export const runQuery = async (sql, params = []) => {
@@ -59,6 +77,9 @@ export const allQuery = async (sql, params = []) => {
 export const initDatabase = async () => {
   try {
     console.log('🔧 Inizializzazione database...');
+
+    // Attendi che il database sia pronto prima di procedere
+    await waitForDatabase();
 
     // ============================================
     // TABELLA CONDOMINIUMS (multi-tenancy)
