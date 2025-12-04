@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { initDatabase } from './database.js';
+import { initializeScheduledBackups } from './utils/backupManager.js';
 
 // Routes
 import authRouter from './routes/auth.js';
@@ -44,6 +45,9 @@ const reportsDir = join(dataDir, 'reports');
 
 // Inizializza database
 await initDatabase();
+
+// Inizializza backup programmati (giornalieri)
+initializeScheduledBackups();
 
 // Inizializza dati di esempio (solo al primo avvio)
 import { initializeSampleData } from './init-data.js';
