@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
 
     const result = await runQuery(
       `INSERT INTO readings (meter_id, reading_date, value, notes)
-       VALUES (?, ?, ?, ?)`,
+       VALUES (${counter++}, ${counter++}, ${counter++}, ${counter++})`,
       [meter_id, reading_date, value, notes || null]
     );
 
@@ -67,7 +67,7 @@ router.post('/', async (req, res) => {
        FROM readings r
        JOIN meters m ON r.meter_id = m.id
        JOIN units u ON m.unit_id = u.id
-       WHERE r.id = ?`,
+       WHERE r.id = ${counter++}`,
       [result.id]
     );
 
@@ -104,7 +104,7 @@ router.post('/batch', async (req, res) => {
 
         // Cerca se esiste già un meter per questa unità e tipo
         const existingMeter = await getQuery(
-          'SELECT id, unit_id, type FROM meters WHERE unit_id = ? AND type = ?',
+          'SELECT id, unit_id, type FROM meters WHERE unit_id = ${counter++} AND type = ${counter++}',
           [unit_id, meter_type]
         );
 
@@ -115,7 +115,7 @@ router.post('/batch', async (req, res) => {
           // Crea nuovo meter
           console.log(`  🆕 Creating new meter: unit_id=${unit_id}, type=${meter_type}`);
           const meterResult = await runQuery(
-            'INSERT INTO meters (unit_id, type, meter_code) VALUES (?, ?, ?)',
+            'INSERT INTO meters (unit_id, type, meter_code) VALUES (${counter++}, ${counter++}, ${counter++})',
             [unit_id, meter_type, `${meter_type}-${unit_id}`]
           );
           meter_id = meterResult.id;
@@ -130,7 +130,7 @@ router.post('/batch', async (req, res) => {
 
       // CRITICAL: Verify that the meter actually belongs to the unit and has the correct type
       const meterVerification = await getQuery(
-        'SELECT id, unit_id, type FROM meters WHERE id = ?',
+        'SELECT id, unit_id, type FROM meters WHERE id = ${counter++}',
         [meter_id]
       );
 
@@ -155,7 +155,7 @@ router.post('/batch', async (req, res) => {
 
       const result = await runQuery(
         `INSERT INTO readings (meter_id, reading_date, value, notes)
-         VALUES (?, ?, ?, ?)`,
+         VALUES (${counter++}, ${counter++}, ${counter++}, ${counter++})`,
         [meter_id, reading_date, value, notes || null]
       );
 
@@ -167,7 +167,7 @@ router.post('/batch', async (req, res) => {
         `SELECT r.*, m.unit_id, m.type as meter_type
          FROM readings r
          JOIN meters m ON r.meter_id = m.id
-         WHERE r.id = ?`,
+         WHERE r.id = ${counter++}`,
         [result.id]
       );
       console.log(`  📊 Verified saved reading:`, savedReading);
@@ -194,11 +194,11 @@ router.put('/:id', async (req, res) => {
     const { reading_date, value, notes } = req.body;
 
     await runQuery(
-      `UPDATE readings SET reading_date = ?, value = ?, notes = ? WHERE id = ?`,
+      `UPDATE readings SET reading_date = ${counter++}, value = ${counter++}, notes = ${counter++} WHERE id = ${counter++}`,
       [reading_date, value, notes, req.params.id]
     );
 
-    const updated = await getQuery('SELECT * FROM readings WHERE id = ?', [req.params.id]);
+    const updated = await getQuery('SELECT * FROM readings WHERE id = ${counter++}', [req.params.id]);
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -208,7 +208,7 @@ router.put('/:id', async (req, res) => {
 // DELETE: Elimina lettura
 router.delete('/:id', async (req, res) => {
   try {
-    await runQuery('DELETE FROM readings WHERE id = ?', [req.params.id]);
+    await runQuery('DELETE FROM readings WHERE id = ${counter++}', [req.params.id]);
     res.json({ message: 'Lettura eliminata con successo' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -221,7 +221,7 @@ router.get('/meters/unit/:unit_id', async (req, res) => {
   try {
     const { type } = req.query;
 
-    let query = 'SELECT * FROM meters WHERE unit_id = ?';
+    let query = 'SELECT * FROM meters WHERE unit_id = ${counter++}';
     const params = [req.params.unit_id];
 
     // CRITICAL: Se specificato type, filtra SOLO per quel tipo

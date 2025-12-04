@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 // GET: Ottieni una singola unità
 router.get('/:id', async (req, res) => {
   try {
-    const unit = await getQuery('SELECT * FROM units WHERE id = ?', [req.params.id]);
+    const unit = await getQuery('SELECT * FROM units WHERE id = ${counter++}', [req.params.id]);
     if (!unit) {
       return res.status(404).json({ error: 'Unità non trovata' });
     }
@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
         monthly_gas_fixed_winter, monthly_gas_fixed_summer,
         foglio, particella, sub, notes
       )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++})`,
       [
         number,
         name,
@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
       ]
     );
 
-    const newUnit = await getQuery('SELECT * FROM units WHERE id = ?', [result.id]);
+    const newUnit = await getQuery('SELECT * FROM units WHERE id = ${counter++}', [result.id]);
     res.status(201).json(newUnit);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -105,12 +105,12 @@ router.put('/:id', async (req, res) => {
 
     await runQuery(
       `UPDATE units
-       SET number = ?, name = ?, surface_area = ?, is_inhabited = ?, is_commercial = ?,
-           has_staircase_lights = ?, monthly_water_fixed = ?,
-           monthly_elec_fixed_winter = ?, monthly_elec_fixed_summer = ?,
-           monthly_gas_fixed_winter = ?, monthly_gas_fixed_summer = ?,
-           foglio = ?, particella = ?, sub = ?, notes = ?
-       WHERE id = ?`,
+       SET number = ${counter++}, name = ${counter++}, surface_area = ${counter++}, is_inhabited = ${counter++}, is_commercial = ${counter++},
+           has_staircase_lights = ${counter++}, monthly_water_fixed = ${counter++},
+           monthly_elec_fixed_winter = ${counter++}, monthly_elec_fixed_summer = ${counter++},
+           monthly_gas_fixed_winter = ${counter++}, monthly_gas_fixed_summer = ${counter++},
+           foglio = ${counter++}, particella = ${counter++}, sub = ${counter++}, notes = ${counter++}
+       WHERE id = ${counter++}`,
       [
         number,
         name,
@@ -131,7 +131,7 @@ router.put('/:id', async (req, res) => {
       ]
     );
 
-    const updated = await getQuery('SELECT * FROM units WHERE id = ?', [req.params.id]);
+    const updated = await getQuery('SELECT * FROM units WHERE id = ${counter++}', [req.params.id]);
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -141,7 +141,7 @@ router.put('/:id', async (req, res) => {
 // DELETE: Elimina unità
 router.delete('/:id', async (req, res) => {
   try {
-    await runQuery('DELETE FROM units WHERE id = ?', [req.params.id]);
+    await runQuery('DELETE FROM units WHERE id = ${counter++}', [req.params.id]);
     res.json({ message: 'Unità eliminata con successo' });
   } catch (error) {
     res.status(500).json({ error: error.message });

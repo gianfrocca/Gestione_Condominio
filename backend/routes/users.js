@@ -29,7 +29,7 @@ router.get('/', filterByCondominium, async (req, res) => {
 
     // Se non è super-admin, filtra per condominio
     if (req.condominiumId) {
-      query += ' AND u.condominium_id = ?';
+      query += ' AND u.condominium_id = $1';
       params.push(req.condominiumId);
     }
 
@@ -61,7 +61,7 @@ router.get('/:id', async (req, res) => {
        FROM users u
        LEFT JOIN condominiums c ON u.condominium_id = c.id
        LEFT JOIN units un ON u.unit_id = un.id
-       WHERE u.id = ?`,
+       WHERE u.id = $1`,
       [req.params.id]
     );
 
@@ -147,7 +147,7 @@ router.post('/', authorize('super_admin', 'admin'), async (req, res) => {
 
     // Verifica che lo username non esista già
     const existingUser = await getQuery(
-      'SELECT id FROM users WHERE username = ?',
+      'SELECT id FROM users WHERE username = ${counter++}',
       [username]
     );
 
@@ -164,7 +164,7 @@ router.post('/', authorize('super_admin', 'admin'), async (req, res) => {
     // Inserisci l'utente
     const result = await runQuery(
       `INSERT INTO users (condominium_id, username, password_hash, email, role, unit_id, full_name, phone, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+       VALUES (${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, 1)`,
       [finalCondominiumId, username, passwordHash, email, role, unit_id || null, full_name || null, phone || null]
     );
 
@@ -173,7 +173,7 @@ router.post('/', authorize('super_admin', 'admin'), async (req, res) => {
       `SELECT u.id, u.condominium_id, u.username, u.email, u.role, u.unit_id,
               u.full_name, u.phone, u.is_active, u.created_at
        FROM users u
-       WHERE u.id = ?`,
+       WHERE u.id = ${counter++}`,
       [result.id]
     );
 
@@ -208,7 +208,7 @@ router.put('/:id', authorize('super_admin', 'admin'), async (req, res) => {
     } = req.body;
 
     // Verifica che l'utente esista
-    const user = await getQuery('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    const user = await getQuery('SELECT * FROM users WHERE id = ${counter++}', [req.params.id]);
 
     if (!user) {
       return res.status(404).json({
@@ -235,9 +235,9 @@ router.put('/:id', authorize('super_admin', 'admin'), async (req, res) => {
     // Aggiorna l'utente
     await runQuery(
       `UPDATE users
-       SET email = ?, role = ?, condominium_id = ?, unit_id = ?,
-           full_name = ?, phone = ?, is_active = ?
-       WHERE id = ?`,
+       SET email = ${counter++}, role = ${counter++}, condominium_id = ${counter++}, unit_id = ${counter++},
+           full_name = ${counter++}, phone = ${counter++}, is_active = ${counter++}
+       WHERE id = ${counter++}`,
       [
         email || user.email,
         role || user.role,
@@ -255,7 +255,7 @@ router.put('/:id', authorize('super_admin', 'admin'), async (req, res) => {
       `SELECT u.id, u.condominium_id, u.username, u.email, u.role, u.unit_id,
               u.full_name, u.phone, u.is_active, u.last_login, u.created_at
        FROM users u
-       WHERE u.id = ?`,
+       WHERE u.id = $1`,
       [req.params.id]
     );
 
@@ -280,7 +280,7 @@ router.put('/:id', authorize('super_admin', 'admin'), async (req, res) => {
 router.delete('/:id', authorize('super_admin', 'admin'), async (req, res) => {
   try {
     // Verifica che l'utente esista
-    const user = await getQuery('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    const user = await getQuery('SELECT * FROM users WHERE id = ${counter++}', [req.params.id]);
 
     if (!user) {
       return res.status(404).json({
@@ -314,7 +314,7 @@ router.delete('/:id', authorize('super_admin', 'admin'), async (req, res) => {
 
     // Soft delete
     await runQuery(
-      'UPDATE users SET is_active = 0 WHERE id = ?',
+      'UPDATE users SET is_active = 0 WHERE id = ${counter++}',
       [req.params.id]
     );
 
@@ -347,7 +347,7 @@ router.post('/:id/reset-password', authorize('super_admin', 'admin'), async (req
     }
 
     // Verifica che l'utente esista
-    const user = await getQuery('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    const user = await getQuery('SELECT * FROM users WHERE id = ${counter++}', [req.params.id]);
 
     if (!user) {
       return res.status(404).json({
@@ -368,7 +368,7 @@ router.post('/:id/reset-password', authorize('super_admin', 'admin'), async (req
 
     // Aggiorna la password
     await runQuery(
-      'UPDATE users SET password_hash = ? WHERE id = ?',
+      'UPDATE users SET password_hash = ${counter++} WHERE id = ${counter++}',
       [passwordHash, req.params.id]
     );
 

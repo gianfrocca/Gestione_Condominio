@@ -48,7 +48,7 @@ router.get('/:id', async (req, res) => {
       `SELECT p.*, u.number as unit_number, u.name as unit_name
        FROM payments p
        JOIN units u ON p.unit_id = u.id
-       WHERE p.id = ?`,
+       WHERE p.id = ${counter++}`,
       [req.params.id]
     );
 
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
 
     const result = await runQuery(
       `INSERT INTO payments (unit_id, payment_date, amount, payment_type, reference_month, notes)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES (${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++})`,
       [unit_id, payment_date, amount, payment_type || null, reference_month || null, notes || null]
     );
 
@@ -84,7 +84,7 @@ router.post('/', async (req, res) => {
       `SELECT p.*, u.number as unit_number, u.name as unit_name
        FROM payments p
        JOIN units u ON p.unit_id = u.id
-       WHERE p.id = ?`,
+       WHERE p.id = ${counter++}`,
       [result.id]
     );
 
@@ -102,9 +102,9 @@ router.put('/:id', async (req, res) => {
 
     await runQuery(
       `UPDATE payments
-       SET unit_id = ?, payment_date = ?, amount = ?, payment_type = ?,
-           reference_month = ?, notes = ?
-       WHERE id = ?`,
+       SET unit_id = ${counter++}, payment_date = ${counter++}, amount = ${counter++}, payment_type = ${counter++},
+           reference_month = ${counter++}, notes = ${counter++}
+       WHERE id = ${counter++}`,
       [unit_id, payment_date, amount, payment_type || null, reference_month || null, notes || null, req.params.id]
     );
 
@@ -112,7 +112,7 @@ router.put('/:id', async (req, res) => {
       `SELECT p.*, u.number as unit_number, u.name as unit_name
        FROM payments p
        JOIN units u ON p.unit_id = u.id
-       WHERE p.id = ?`,
+       WHERE p.id = ${counter++}`,
       [req.params.id]
     );
 
@@ -126,7 +126,7 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/payments/:id - Elimina pagamento
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await runQuery('DELETE FROM payments WHERE id = ?', [req.params.id]);
+    const result = await runQuery('DELETE FROM payments WHERE id = ${counter++}', [req.params.id]);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Pagamento non trovato' });
@@ -150,7 +150,7 @@ router.get('/summary-all', async (req, res) => {
         const paidResult = await getQuery(
           `SELECT COALESCE(SUM(amount), 0) as total_paid
            FROM payments
-           WHERE unit_id = ?`,
+           WHERE unit_id = ${counter++}`,
           [unit.id]
         );
 
@@ -158,7 +158,7 @@ router.get('/summary-all', async (req, res) => {
         const dueResult = await getQuery(
           `SELECT COALESCE(SUM(total_cost), 0) as total_due
            FROM monthly_splits
-           WHERE unit_id = ?`,
+           WHERE unit_id = ${counter++}`,
           [unit.id]
         );
 
@@ -194,7 +194,7 @@ router.get('/summary/:unit_id', async (req, res) => {
     const paidResult = await getQuery(
       `SELECT COALESCE(SUM(amount), 0) as total_paid
        FROM payments
-       WHERE unit_id = ?`,
+       WHERE unit_id = ${counter++}`,
       [unit_id]
     );
 
@@ -202,7 +202,7 @@ router.get('/summary/:unit_id', async (req, res) => {
     const dueResult = await getQuery(
       `SELECT COALESCE(SUM(total_cost), 0) as total_due
        FROM monthly_splits
-       WHERE unit_id = ?`,
+       WHERE unit_id = ${counter++}`,
       [unit_id]
     );
 
