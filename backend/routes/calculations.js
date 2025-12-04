@@ -49,7 +49,7 @@ router.post('/calculate', async (req, res) => {
         `INSERT OR REPLACE INTO monthly_splits
          (month, unit_id, cost_gas_heating, cost_gas_hot_water, cost_elec_heating,
           cost_elec_hot_water, cost_elec_cooling, cost_elec_cold_water, cost_elec_fixed, total_cost)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++})`,
         [
           dateFrom,
           unit.unit_id,
@@ -124,7 +124,7 @@ router.get('/annual-summary/:year', async (req, res) => {
          COUNT(*) as months_count
        FROM monthly_splits ms
        JOIN units u ON ms.unit_id = u.id
-       WHERE strftime("%Y", ms.month) = ?
+       WHERE strftime("%Y", ms.month) = ${counter++}
        GROUP BY ms.unit_id, u.number, u.name
        ORDER BY u.number`,
       [year]
@@ -151,7 +151,7 @@ router.get('/monthly-stats/:month', async (req, res) => {
          ms.cost_elec_cold_water + ms.cost_elec_fixed as total_elec
        FROM monthly_splits ms
        JOIN units u ON ms.unit_id = u.id
-       WHERE strftime("%Y-%m", ms.month) = ?
+       WHERE strftime("%Y-%m", ms.month) = ${counter++}
        ORDER BY u.number`,
       [month]
     );
