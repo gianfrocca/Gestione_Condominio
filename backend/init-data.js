@@ -8,9 +8,9 @@ import { runQuery, getQuery, allQuery } from './database.js';
 export async function initializeSampleData() {
   try {
     // Controlla se esistono già unità
-    const existing = await allQuery('SELECT COUNT(*) as count FROM units');
+    const existingUnits = await allQuery('SELECT id FROM units');
 
-    if (existing[0].count > 0) {
+    if (existingUnits && existingUnits.length > 0) {
       console.log('✅ Dati già inizializzati');
       return;
     }
