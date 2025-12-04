@@ -225,24 +225,31 @@ const createFileStorageDefaults = async () => {
  */
 const createDefaultData = async () => {
   // Crea condominio di default se non esiste
-  const existingCondo = await getQuery('SELECT id FROM condominiums WHERE id = 1');
+  const existingCondo = await getQuery(
+    `SELECT id FROM condominiums WHERE id = $1`,
+    [1]
+  );
   if (!existingCondo) {
     await runQuery(
-      `INSERT INTO condominiums (id, name, address, notes) VALUES (1, 'Condominio Default', 'Via Example 1', 'Condominio principale')`
+      `INSERT INTO condominiums (id, name, address, notes) VALUES ($1, $2, $3, $4)`,
+      [1, 'Condominio Default', 'Via Example 1', 'Condominio principale']
     );
     console.log('  ✅ Condominio di default creato');
   }
 
   // Crea super-admin di default se non esiste
-  const existingSuperAdmin = await getQuery('SELECT id FROM users WHERE role = "super_admin"');
+  const existingSuperAdmin = await getQuery(
+    `SELECT id FROM users WHERE role = $1`,
+    ['super_admin']
+  );
   if (!existingSuperAdmin) {
     const bcrypt = await import('bcrypt');
     const passwordHash = await bcrypt.hash('admin123', 10);
 
     await runQuery(
       `INSERT INTO users (condominium_id, username, password_hash, email, role, full_name, is_active)
-       VALUES (NULL, 'superadmin', ?, 'admin@example.com', 'super_admin', 'Super Administrator', 1)`,
-      [passwordHash]
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [null, 'superadmin', passwordHash, 'admin@example.com', 'super_admin', 'Super Administrator', true]
     );
     console.log('  ✅ Super-admin creato (username: superadmin, password: admin123)');
     console.log('  ⚠️  IMPORTANTE: Cambia la password al primo login!');
@@ -269,12 +276,19 @@ const createDefaultData = async () => {
   ];
 
   for (const [key, value, description] of defaultSettings) {
-    await runQuery(
-      `INSERT INTO settings (key, condominium_id, value, description)
-       VALUES ($1, 1, $2, $3)
-       ON CONFLICT (key, condominium_id) DO NOTHING`,
-      [key, value, description]
+    // Controlla se la setting già esiste
+    const existing = await getQuery(
+      `SELECT key FROM settings WHERE key = $1 AND condominium_id = 1`,
+      [key]
     );
+
+    if (!existing) {
+      await runQuery(
+        `INSERT INTO settings (key, condominium_id, value, description)
+         VALUES ($1, 1, $2, $3)`,
+        [key, value, description]
+      );
+    }
   }
   console.log('  ✅ Impostazioni di default create');
 };
