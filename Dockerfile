@@ -1,33 +1,42 @@
-# Build stage
-FROM node:18 AS builder
-
-WORKDIR /app
-
-COPY . .
-
-# Installa tutte le dipendenze (incluse devDependencies per build)
-WORKDIR /app/backend
-RUN npm install
+# Stage 1: Build Frontend
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app/frontend
-RUN npm install && npm run build
 
-# Runtime stage
-FROM node:18-slim
+COPY frontend/package*.json ./
 
-WORKDIR /app
+RUN npm ci
 
-# Copia i file compilati dal builder
-COPY --from=builder /app/backend ./backend
-COPY --from=builder /app/frontend/dist ./frontend/dist
-COPY --from=builder /app/package.json ./package.json
+COPY frontend .
 
-# Rimuovi i devDependencies dai node_modules già copiati
-WORKDIR /app/backend
-RUN npm prune --omit=dev
+RUN npm run build
+
+# Stage 2: Build Backend & Runtime
+FROM node:22-alpine
 
 WORKDIR /app
 
+# Copia package.json del backend
+COPY package*.json ./
+
+# Installa dipendenze backend
+RUN npm ci --omit=dev
+
+# Copia il backend
+COPY backend ./backend
+
+# Copia il frontend buildato dallo stage 1
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+# Crea directory per i dati
+RUN mkdir -p data/storage data/backups data/bills data/reports
+
+# Espone porta
 EXPOSE 3000
 
-CMD ["node", "backend/server.js"]
+# Variabili di ambiente di default
+ENV STORAGE_TYPE=file
+ENV NODE_ENV=production
+
+# Avvia il server
+CMD ["npm", "start"]
