@@ -3,14 +3,24 @@ import pg from 'pg';
 const { Pool } = pg;
 
 // Configurazione connessione PostgreSQL da variabili di ambiente
-const pool = new Pool({
-  user: process.env.DB_USER || 'condominio_user',
-  password: process.env.DB_PASSWORD || 'password',
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'condominio_db',
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-});
+// Supporta sia URL completa (connectionString) che parametri singoli
+const poolConfig = process.env.DB_HOST && process.env.DB_HOST.startsWith('postgres://')
+  ? {
+      // Usa connectionString se DB_HOST è un'URL completa (es. da Coolify)
+      connectionString: process.env.DB_HOST,
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    }
+  : {
+      // Altrimenti usa parametri singoli
+      user: process.env.DB_USER || 'condominio_user',
+      password: process.env.DB_PASSWORD || 'password',
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME || 'condominio_db',
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    };
+
+const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
   console.error('Errore pool connessione PostgreSQL:', err.message);
