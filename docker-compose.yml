@@ -24,8 +24,8 @@ services:
   # Applicazione Node.js
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: /app
+      dockerfile: /app/Dockerfile
     container_name: condominio-app
     environment:
       NODE_ENV: production
