@@ -5,7 +5,11 @@ node_modules/
 data/*.db
 data/bills/*
 data/reports/*
+data/backups/*
+data/storage/*.json
 !data/bills/.gitkeep
 !data/reports/.gitkeep
+!data/backups/.gitkeep
+!data/storage/.gitkeep
 .vscode/
 .idea/
