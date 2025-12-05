@@ -14,6 +14,9 @@ RUN npm run build
 # Stage 2: Build Backend & Runtime
 FROM node:22-alpine
 
+# Installa curl per healthcheck e wget per compatibilità
+RUN apk add --no-cache curl wget
+
 WORKDIR /app
 
 # Copia package.json del backend
