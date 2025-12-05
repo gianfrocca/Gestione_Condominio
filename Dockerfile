@@ -31,6 +31,10 @@ COPY backend ./backend
 # Copia il frontend buildato dallo stage 1
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
+# Copia entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Crea directory per i dati
 RUN mkdir -p data/storage data/backups data/bills data/reports
 
@@ -44,5 +48,5 @@ EXPOSE 3000
 ENV STORAGE_TYPE=file
 ENV NODE_ENV=production
 
-# Avvia il server
-CMD ["npm", "start"]
+# Usa l'entrypoint script per inizializzazione automatica
+ENTRYPOINT ["/app/entrypoint.sh"]
