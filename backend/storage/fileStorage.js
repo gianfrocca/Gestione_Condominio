@@ -130,8 +130,13 @@ class FileStorage {
   /**
    * Esecuzione SQL - interpreta le query basilari
    * Supporta: SELECT, INSERT, UPDATE, DELETE
+   * Converte $1, $2, $3... in ? per compatibilità
    */
   executeSql(sql, params = []) {
+    // Normalizza i parametri: $1, $2, $3... → ?
+    // Questo permette di supportare sia il formato ? che $N
+    sql = sql.replace(/\$\d+/g, '?');
+
     const sqlNormalized = sql.trim().toUpperCase();
 
     if (sqlNormalized.startsWith('SELECT')) {
