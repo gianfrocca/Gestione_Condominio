@@ -34,6 +34,9 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # Crea directory per i dati
 RUN mkdir -p data/storage data/backups data/bills data/reports
 
+# Dichiara il volume per la persistenza automatica
+VOLUME ["/app/data"]
+
 # Espone porta
 EXPOSE 3000
 
