@@ -250,12 +250,17 @@ class FileStorage {
     const setClauses = setMatch[1].split(',').map(s => s.trim());
     const whereClause = whereMatch[1];
 
+    // Estrai i parametri del WHERE (gli ultimi N, dove N = numero di ? nella WHERE)
+    const whereParamCount = (whereClause.match(/\?/g) || []).length;
+    const whereParams = params.slice(-whereParamCount);
+    const setParams = params.slice(0, setClauses.length);
+
     let changes = 0;
     table.forEach(row => {
-      if (this.evaluateWhere(row, whereClause, params)) {
+      if (this.evaluateWhere(row, whereClause, whereParams)) {
         setClauses.forEach((setClause, idx) => {
           const [col] = setClause.split('=').map(s => s.trim());
-          row[col] = params[idx];
+          row[col] = setParams[idx];
         });
         changes++;
       }
