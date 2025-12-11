@@ -255,7 +255,7 @@ class FileStorage {
       if (this.evaluateWhere(row, whereClause, params)) {
         setClauses.forEach((setClause, idx) => {
           const [col] = setClause.split('=').map(s => s.trim());
-          row[col] = params[setClauses.length + idx];
+          row[col] = params[idx];
         });
         changes++;
       }
