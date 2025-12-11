@@ -19,6 +19,7 @@ import reportsRouter from './routes/reports.js';
 import paymentsRouter from './routes/payments.js';
 import backupRouter from './routes/backup.js';
 import excelRouter from './routes/excel.js';
+import debugRouter from './routes/debug.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -97,6 +98,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/excel', excelRouter);
+app.use('/api/debug', debugRouter);
 
 // Serve frontend statico (dopo le API routes)
 const frontendPath = join(__dirname, '../frontend/dist');
