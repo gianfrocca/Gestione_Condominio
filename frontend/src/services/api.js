@@ -166,15 +166,14 @@ export const usersAPI = {
 
 // Backup API
 export const backupAPI = {
-  exportSQL: () => api.get('/backup/export-sql', { responseType: 'blob' }),
-  importSQL: (file) => {
+  exportJSON: () => api.get('/backup/export-json', { responseType: 'blob' }),
+  importJSON: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/backup/import-sql', formData, {
+    return api.post('/backup/import-json', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-  downloadDatabase: () => api.get('/backup/download-db', { responseType: 'blob' }),
 };
 
 // Excel API

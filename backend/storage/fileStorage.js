@@ -175,7 +175,7 @@ class FileStorage {
     let results = [...table];
 
     // Applica WHERE conditions semplici
-    const whereMatch = sql.match(/WHERE\s+(.+?)(?:ORDER BY|LIMIT|$)/i);
+    const whereMatch = sql.match(/WHERE\s+(.+?)(?:ORDER BY|LIMIT|$)/is);  // Added 's' flag for multiline
     if (whereMatch) {
       const whereClause = whereMatch[1];
       results = results.filter(row => this.evaluateWhere(row, whereClause, params));
@@ -236,8 +236,8 @@ class FileStorage {
   executeUpdate(sql, params) {
     // Parse semplice: UPDATE table SET col=? WHERE id=?
     const tableMatch = sql.match(/UPDATE\s+(\w+)/i);
-    const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/i);
-    const whereMatch = sql.match(/WHERE\s+(.+?)$/i);
+    const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/is);  // Added 's' flag for multiline matching
+    const whereMatch = sql.match(/WHERE\s+(.+?)$/is);     // Added 's' flag for multiline matching
 
     if (!tableMatch || !setMatch || !whereMatch) {
       throw new Error('UPDATE non valido');
@@ -250,17 +250,37 @@ class FileStorage {
     const setClauses = setMatch[1].split(',').map(s => s.trim());
     const whereClause = whereMatch[1];
 
+    // Estrai i parametri del WHERE (gli ultimi N, dove N = numero di ? nella WHERE)
+    const whereParamCount = (whereClause.match(/\?/g) || []).length;
+    const whereParams = params.slice(-whereParamCount);
+    const setParams = params.slice(0, setClauses.length);
+
+    console.log(`🔧 UPDATE ${tableName}:`);
+    console.log(`   SET clauses: ${setClauses.length}`);
+    console.log(`   SET clauses: ${JSON.stringify(setClauses)}`);
+    console.log(`   WHERE clause: ${whereClause}`);
+    console.log(`   Total params: ${params.length}, Set params: ${setParams.length}, Where params: ${whereParams.length}`);
+    console.log(`   Set params values:`, setParams);
+    console.log(`   Where params values:`, whereParams);
+
     let changes = 0;
-    table.forEach(row => {
-      if (this.evaluateWhere(row, whereClause, params)) {
+    table.forEach((row, rowIdx) => {
+      const whereMatches = this.evaluateWhere(row, whereClause, whereParams);
+      console.log(`   Row ${rowIdx}: id=${row.id}, whereMatches=${whereMatches}`);
+
+      if (whereMatches) {
+        console.log(`     ✓ Updating row ${rowIdx}...`);
         setClauses.forEach((setClause, idx) => {
           const [col] = setClause.split('=').map(s => s.trim());
-          row[col] = params[setClauses.length + idx];
+          const oldValue = row[col];
+          row[col] = setParams[idx];
+          console.log(`       ${col}: ${oldValue} → ${setParams[idx]}`);
         });
         changes++;
       }
     });
 
+    console.log(`   Result: ${changes} rows updated`);
     return { changes };
   }
 
@@ -269,7 +289,7 @@ class FileStorage {
    */
   executeDelete(sql, params) {
     const tableMatch = sql.match(/FROM\s+(\w+)/i);
-    const whereMatch = sql.match(/WHERE\s+(.+?)$/i);
+    const whereMatch = sql.match(/WHERE\s+(.+?)$/is);  // Added 's' flag for multiline
 
     if (!tableMatch) throw new Error('DELETE senza FROM');
 

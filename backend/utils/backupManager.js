@@ -247,6 +247,84 @@ export const restoreBackup = async (filename) => {
 };
 
 /**
+ * Esporta il database JSON per il download
+ */
+export const exportDatabaseJSON = async () => {
+  try {
+    const storageType = process.env.STORAGE_TYPE || 'file';
+
+    if (storageType === 'file') {
+      const sourceFile = path.join(__dirname, '../../data/storage/database.json');
+      const content = await fs.readFile(sourceFile, 'utf-8');
+      const timestamp = new Date().toISOString().split('T')[0];
+
+      return {
+        filename: `condominio-backup-${timestamp}.json`,
+        content,
+        contentType: 'application/json'
+      };
+    } else {
+      throw new Error('Export JSON supportato solo per FileStorage');
+    }
+  } catch (error) {
+    console.error('❌ Errore export JSON:', error);
+    throw error;
+  }
+};
+
+/**
+ * Importa un file JSON nel database
+ * Valida la struttura prima di importare
+ */
+export const importDatabaseJSON = async (fileContent) => {
+  try {
+    // Parsea il JSON
+    let importedData;
+    try {
+      importedData = JSON.parse(fileContent);
+    } catch (parseError) {
+      throw new Error('Il file non è un JSON valido');
+    }
+
+    // Valida la struttura - deve avere almeno le tabelle principali
+    const requiredTables = [
+      'condominiums', 'users', 'units', 'meters', 'readings', 'bills', 'settings'
+    ];
+
+    for (const table of requiredTables) {
+      if (!Array.isArray(importedData[table])) {
+        throw new Error(`Struttura JSON non valida: manca la tabella "${table}" o non è un array`);
+      }
+    }
+
+    const storageType = process.env.STORAGE_TYPE || 'file';
+
+    if (storageType === 'file') {
+      const sourceFile = path.join(__dirname, '../../data/storage/database.json');
+
+      // Crea un backup automatico prima di importare
+      const backupBefore = await createBackup();
+      console.log(`💾 Backup automatico creato: ${backupBefore.file}`);
+
+      // Scrivi il nuovo database
+      await fs.writeFile(sourceFile, JSON.stringify(importedData, null, 2), 'utf-8');
+      console.log('✅ Database importato con successo');
+
+      return {
+        success: true,
+        message: 'Database importato con successo',
+        backupFile: backupBefore.file
+      };
+    } else {
+      throw new Error('Import JSON supportato solo per FileStorage');
+    }
+  } catch (error) {
+    console.error('❌ Errore import JSON:', error);
+    throw error;
+  }
+};
+
+/**
  * Inizializza backup programmati (giornalieri)
  */
 let backupInterval = null;
@@ -284,6 +362,8 @@ export default {
   listBackups,
   downloadBackup,
   restoreBackup,
+  exportDatabaseJSON,
+  importDatabaseJSON,
   initializeScheduledBackups,
   stopScheduledBackups
 };

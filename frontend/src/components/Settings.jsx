@@ -1030,112 +1030,79 @@ function Settings() {
           <div className="card">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <Database className="h-5 w-5 mr-2" />
-              Backup Database (SQL)
+              Backup Database (JSON)
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              Esporta e importa il database completo in formato SQL. Utile per backup rapidi durante i test.
+              Esporta e importa il database completo in formato JSON. Utile per backup e trasferimenti dati.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <button
                   onClick={async () => {
                     try {
-                      const { data } = await backupAPI.exportSQL();
+                      const { data } = await backupAPI.exportJSON();
                       const url = window.URL.createObjectURL(new Blob([data]));
                       const link = document.createElement('a');
                       link.href = url;
-                      link.setAttribute('download', `backup_${new Date().toISOString().split('T')[0]}.sql`);
+                      link.setAttribute('download', `condominio-backup-${new Date().toISOString().split('T')[0]}.json`);
                       document.body.appendChild(link);
                       link.click();
                       link.remove();
-                      alert('Backup SQL esportato con successo!');
+                      alert('Backup JSON esportato con successo!');
                     } catch (error) {
-                      console.error('Errore export SQL:', error);
-                      alert('Errore durante l\'export SQL');
+                      console.error('Errore export JSON:', error);
+                      alert('Errore durante l\'export: ' + error.message);
                     }
                   }}
                   className="btn-primary w-full flex items-center justify-center space-x-2"
                 >
                   <Download className="h-5 w-5" />
-                  <span>Esporta SQL</span>
+                  <span>Esporta JSON</span>
                 </button>
                 <p className="text-xs text-gray-500 mt-2">
-                  Scarica un file .sql con tutti i dati e la struttura
+                  Scarica un file .json con tutti i dati del database
                 </p>
               </div>
               <div>
                 <label className="btn-secondary w-full flex items-center justify-center space-x-2 cursor-pointer">
                   <Upload className="h-5 w-5" />
-                  <span>Importa SQL</span>
+                  <span>Importa JSON</span>
                   <input
                     type="file"
-                    accept=".sql"
+                    accept=".json"
                     className="hidden"
                     onChange={async (e) => {
                       const file = e.target.files[0];
                       if (!file) return;
 
-                      if (!confirm('ATTENZIONE: Questa operazione sovrascriverà tutti i dati attuali. Continuare?')) {
+                      if (!confirm('ATTENZIONE: Questa operazione sovrascriverà tutti i dati attuali. Un backup automatico verrà creato. Continuare?')) {
                         e.target.value = '';
                         return;
                       }
 
                       try {
-                        await backupAPI.importSQL(file);
+                        await backupAPI.importJSON(file);
                         alert('Database importato con successo! Ricarica la pagina.');
                         window.location.reload();
                       } catch (error) {
-                        console.error('Errore import SQL:', error);
-                        alert('Errore durante l\'import: ' + (error.response?.data?.error || error.message));
+                        console.error('Errore import JSON:', error);
+                        alert('Errore durante l\'import: ' + (error.response?.data?.details || error.message));
                       }
                       e.target.value = '';
                     }}
                   />
                 </label>
                 <p className="text-xs text-gray-500 mt-2">
-                  Ripristina da un file .sql precedentemente esportato
+                  Ripristina da un file .json precedentemente esportato
                 </p>
               </div>
             </div>
 
             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
-                <strong>⚠️ Importante:</strong> L'import sovrascriverà TUTTI i dati esistenti. Esporta sempre un backup prima di importare.
+                <strong>⚠️ Importante:</strong> L'import sovrascriverà TUTTI i dati esistenti. Un backup automatico viene creato prima dell'import. Esporta sempre un backup prima di importare nuovi dati.
               </p>
             </div>
-          </div>
-
-          {/* Database SQLite Binario */}
-          <div className="card">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <Database className="h-5 w-5 mr-2" />
-              Database SQLite Completo
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Scarica una copia completa del database SQLite (file binario).
-            </p>
-            <button
-              onClick={async () => {
-                try {
-                  const { data } = await backupAPI.downloadDatabase();
-                  const url = window.URL.createObjectURL(new Blob([data]));
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.setAttribute('download', `database_${new Date().toISOString().split('T')[0]}.sqlite`);
-                  document.body.appendChild(link);
-                  link.click();
-                  link.remove();
-                  alert('Database scaricato con successo!');
-                } catch (error) {
-                  console.error('Errore download database:', error);
-                  alert('Errore durante il download del database');
-                }
-              }}
-              className="btn-primary flex items-center space-x-2"
-            >
-              <Download className="h-5 w-5" />
-              <span>Scarica Database SQLite</span>
-            </button>
           </div>
 
           {/* Export Excel */}

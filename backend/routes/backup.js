@@ -5,6 +5,8 @@ import {
   listBackups,
   downloadBackup,
   restoreBackup,
+  exportDatabaseJSON,
+  importDatabaseJSON,
   ensureBackupDir
 } from '../utils/backupManager.js';
 
@@ -93,6 +95,56 @@ router.post('/restore/:filename', async (req, res) => {
     console.error('❌ Errore ripristino backup:', error);
     res.status(500).json({
       error: 'Errore durante il ripristino del backup',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Esporta il database in formato JSON
+ * GET /api/backup/export-json
+ */
+router.get('/export-json', async (req, res) => {
+  try {
+    const backup = await exportDatabaseJSON();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=${backup.filename}`);
+    res.send(backup.content);
+  } catch (error) {
+    console.error('❌ Errore export JSON:', error);
+    res.status(500).json({
+      error: 'Errore durante l\'esportazione del database',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Importa un database da file JSON
+ * POST /api/backup/import-json
+ */
+router.post('/import-json', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        error: 'Nessun file fornito',
+        details: 'Invia un file JSON con il backup del database'
+      });
+    }
+
+    // Converti il buffer in stringa
+    const fileContent = req.file.buffer.toString('utf-8');
+
+    const result = await importDatabaseJSON(fileContent);
+    res.json({
+      success: true,
+      message: result.message,
+      backupFile: result.backupFile
+    });
+  } catch (error) {
+    console.error('❌ Errore import JSON:', error);
+    res.status(500).json({
+      error: 'Errore durante l\'importazione del database',
       details: error.message
     });
   }

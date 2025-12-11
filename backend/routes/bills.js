@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
 // GET: Ottieni singola bolletta
 router.get('/:id', async (req, res) => {
   try {
-    const bill = await getQuery('SELECT * FROM bills WHERE id = ${counter++}', [req.params.id]);
+    const bill = await getQuery('SELECT * FROM bills WHERE id = ?', [req.params.id]);
     if (!bill) {
       return res.status(404).json({ error: 'Bolletta non trovata' });
     }
@@ -92,11 +92,11 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     const result = await runQuery(
       `INSERT INTO bills (bill_date, type, amount, provider, bill_period_start, bill_period_end, file_path, notes)
-       VALUES (${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++}, ${counter++})`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [bill_date, type, parseFloat(amount), provider, bill_period_start, bill_period_end, filePath, notes]
     );
 
-    const newBill = await getQuery('SELECT * FROM bills WHERE id = ${counter++}', [result.id]);
+    const newBill = await getQuery('SELECT * FROM bills WHERE id = ?', [result.id]);
     res.status(201).json(newBill);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -110,12 +110,12 @@ router.put('/:id', async (req, res) => {
 
     await runQuery(
       `UPDATE bills
-       SET bill_date = ${counter++}, type = ${counter++}, amount = ${counter++}, provider = ${counter++}, bill_period_start = ${counter++}, bill_period_end = ${counter++}, notes = ${counter++}
-       WHERE id = ${counter++}`,
+       SET bill_date = ?, type = ?, amount = ?, provider = ?, bill_period_start = ?, bill_period_end = ?, notes = ?
+       WHERE id = ?`,
       [bill_date, type, parseFloat(amount), provider, bill_period_start, bill_period_end, notes, req.params.id]
     );
 
-    const updated = await getQuery('SELECT * FROM bills WHERE id = ${counter++}', [req.params.id]);
+    const updated = await getQuery('SELECT * FROM bills WHERE id = ?', [req.params.id]);
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -125,7 +125,7 @@ router.put('/:id', async (req, res) => {
 // DELETE: Elimina bolletta
 router.delete('/:id', async (req, res) => {
   try {
-    await runQuery('DELETE FROM bills WHERE id = ${counter++}', [req.params.id]);
+    await runQuery('DELETE FROM bills WHERE id = ?', [req.params.id]);
     res.json({ message: 'Bolletta eliminata con successo' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -135,7 +135,7 @@ router.delete('/:id', async (req, res) => {
 // GET: Download file bolletta
 router.get('/:id/file', async (req, res) => {
   try {
-    const bill = await getQuery('SELECT file_path FROM bills WHERE id = ${counter++}', [req.params.id]);
+    const bill = await getQuery('SELECT file_path FROM bills WHERE id = ?', [req.params.id]);
 
     if (!bill || !bill.file_path) {
       return res.status(404).json({ error: 'File non trovato' });
