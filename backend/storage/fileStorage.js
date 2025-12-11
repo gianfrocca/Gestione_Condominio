@@ -227,7 +227,7 @@ class FileStorage {
    */
   executeInsert(sql, params) {
     // Parse: INSERT INTO table (col1, col2) VALUES (?, ?)
-    const match = sql.match(/INSERT INTO\s+(\w+)\s*\((.+?)\)\s*VALUES/i);
+    const match = sql.match(/INSERT INTO\s+(\w+)\s*\((.+?)\)\s*VALUES/is);  // Added 's' flag for multiline
     if (!match) throw new Error('INSERT non valido');
 
     const tableName = match[1].toLowerCase();
