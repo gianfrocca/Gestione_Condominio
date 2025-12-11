@@ -96,7 +96,17 @@ class FileStorage {
    */
   async saveToFile() {
     try {
-      await fs.writeFile(this.dataFile, JSON.stringify(this.data, null, 2), 'utf-8');
+      console.log(`\n💾 saveToFile() called`);
+      console.log(`   Readings table has ${this.data.readings?.length || 0} records`);
+      if (this.data.readings && this.data.readings.length > 0) {
+        console.log(`   First reading:`, this.data.readings[0]);
+      }
+
+      const jsonContent = JSON.stringify(this.data, null, 2);
+      console.log(`   File size: ${jsonContent.length} bytes`);
+
+      await fs.writeFile(this.dataFile, jsonContent, 'utf-8');
+      console.log(`   ✅ File written successfully`);
     } catch (error) {
       console.error('❌ Errore salvataggio su file:', error);
       throw error;
@@ -199,6 +209,14 @@ class FileStorage {
     const tableName = fromMatch[1].toLowerCase();
     const table = this.data[tableName];
 
+    console.log(`   🟢 executeSelect: table=${tableName}, table exists=${!!table}`);
+    if (table) {
+      console.log(`   🟢 Table has ${table.length} records`);
+      if (table.length > 0) {
+        console.log(`     First record:`, table[0]);
+      }
+    }
+
     if (!table) {
       console.warn(`Tabella ${tableName} non trovata, ritorno array vuoto`);
       return [];
@@ -234,6 +252,7 @@ class FileStorage {
       results = results.slice(0, limit);
     }
 
+    console.log(`   🟢 executeSelect returning ${results.length} results`);
     return results;
   }
 
