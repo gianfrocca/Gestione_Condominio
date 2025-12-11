@@ -292,6 +292,20 @@ class FileStorage {
   }
 
   /**
+   * Normalizza i valori per il confronto
+   * Converte boolean e stringhe numeriche al tipo appropriato
+   */
+  normalizeValue(value) {
+    if (value === true || value === 1 || value === '1') return 1;
+    if (value === false || value === 0 || value === '0') return 0;
+    // Prova a convertire a numero
+    const num = Number(value);
+    if (!isNaN(num) && value !== '') return num;
+    // Altrimenti ritorna come stringa
+    return String(value).toLowerCase();
+  }
+
+  /**
    * Valuta una WHERE clause semplice
    */
   evaluateWhere(row, whereClause, params) {
@@ -318,19 +332,23 @@ class FileStorage {
       const rowValue = row[column.toLowerCase()];
       const compareValue = value.replace(/'/g, '');
 
+      // Normalizza i valori per il confronto
+      const normalizedRowValue = this.normalizeValue(rowValue);
+      const normalizedCompareValue = this.normalizeValue(compareValue);
+
       switch (operator) {
         case '=':
-          return String(rowValue) === compareValue;
+          return normalizedRowValue === normalizedCompareValue;
         case '!=':
-          return String(rowValue) !== compareValue;
+          return normalizedRowValue !== normalizedCompareValue;
         case '<':
-          return rowValue < compareValue;
+          return normalizedRowValue < normalizedCompareValue;
         case '>':
-          return rowValue > compareValue;
+          return normalizedRowValue > normalizedCompareValue;
         case '<=':
-          return rowValue <= compareValue;
+          return normalizedRowValue <= normalizedCompareValue;
         case '>=':
-          return rowValue >= compareValue;
+          return normalizedRowValue >= normalizedCompareValue;
         default:
           return true;
       }
