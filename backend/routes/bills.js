@@ -39,22 +39,27 @@ router.get('/', async (req, res) => {
   try {
     const { type, month, year } = req.query;
 
-    let query = 'SELECT * FROM bills WHERE 1=1';
+    let query = 'SELECT * FROM bills';
     const params = [];
+    const conditions = [];
 
     if (type) {
-      query += ' AND type = ?';
+      conditions.push('type = ?');
       params.push(type);
     }
 
     if (month) {
-      query += ' AND strftime("%Y-%m", bill_date) = ?';
+      conditions.push('strftime("%Y-%m", bill_date) = ?');
       params.push(month);
     }
 
     if (year) {
-      query += ' AND strftime("%Y", bill_date) = ?';
+      conditions.push('strftime("%Y", bill_date) = ?');
       params.push(year);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY bill_date DESC';

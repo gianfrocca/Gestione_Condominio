@@ -96,7 +96,17 @@ class FileStorage {
    */
   async saveToFile() {
     try {
-      await fs.writeFile(this.dataFile, JSON.stringify(this.data, null, 2), 'utf-8');
+      console.log(`\n💾 saveToFile() called`);
+      console.log(`   Readings table has ${this.data.readings?.length || 0} records`);
+      if (this.data.readings && this.data.readings.length > 0) {
+        console.log(`   First reading:`, this.data.readings[0]);
+      }
+
+      const jsonContent = JSON.stringify(this.data, null, 2);
+      console.log(`   File size: ${jsonContent.length} bytes`);
+
+      await fs.writeFile(this.dataFile, jsonContent, 'utf-8');
+      console.log(`   ✅ File written successfully`);
     } catch (error) {
       console.error('❌ Errore salvataggio su file:', error);
       throw error;
@@ -134,9 +144,18 @@ class FileStorage {
    */
   async runQuery(sql, params = []) {
     try {
+      console.log(`\n🟣 runQuery called`);
+      console.log(`   SQL: ${sql.substring(0, 80)}...`);
+      console.log(`   Params: ${JSON.stringify(params)}`);
+
       const result = this.executeSql(sql, params);
+      console.log(`   ✅ executeSql returned:`, result);
+
       // Salva i cambiamenti su file
+      console.log(`   💾 Saving to file...`);
       await this.saveToFile();
+      console.log(`   ✅ Saved to file`);
+
       return { id: result.lastId, changes: result.changes };
     } catch (error) {
       console.error('❌ Errore runQuery:', error);
@@ -156,13 +175,19 @@ class FileStorage {
 
     const sqlNormalized = sql.trim().toUpperCase();
 
+    console.log(`   🔷 executeSql - SQL type: ${sqlNormalized.substring(0, 20)}...`);
+
     if (sqlNormalized.startsWith('SELECT')) {
+      console.log(`   🔷 → Calling executeSelect`);
       return this.executeSelect(sql, params);
     } else if (sqlNormalized.startsWith('INSERT')) {
+      console.log(`   🔷 → Calling executeInsert`);
       return this.executeInsert(sql, params);
     } else if (sqlNormalized.startsWith('UPDATE')) {
+      console.log(`   🔷 → Calling executeUpdate`);
       return this.executeUpdate(sql, params);
     } else if (sqlNormalized.startsWith('DELETE')) {
+      console.log(`   🔷 → Calling executeDelete`);
       return this.executeDelete(sql, params);
     } else if (sqlNormalized.startsWith('CREATE')) {
       return { changes: 0 }; // CREATE TABLE non fa nulla in file storage
@@ -183,6 +208,14 @@ class FileStorage {
 
     const tableName = fromMatch[1].toLowerCase();
     const table = this.data[tableName];
+
+    console.log(`   🟢 executeSelect: table=${tableName}, table exists=${!!table}`);
+    if (table) {
+      console.log(`   🟢 Table has ${table.length} records`);
+      if (table.length > 0) {
+        console.log(`     First record:`, table[0]);
+      }
+    }
 
     if (!table) {
       console.warn(`Tabella ${tableName} non trovata, ritorno array vuoto`);
@@ -219,6 +252,7 @@ class FileStorage {
       results = results.slice(0, limit);
     }
 
+    console.log(`   🟢 executeSelect returning ${results.length} results`);
     return results;
   }
 

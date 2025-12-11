@@ -33,14 +33,14 @@ router.post('/test-login', async (req, res) => {
     console.log(`[DEBUG] Testing login: username=${username}, password=${password}`);
 
     const user = await allQuery(
-      'SELECT * FROM users WHERE username = $1',
+      'SELECT * FROM users WHERE username = ?',
       [username]
     );
 
     console.log(`[DEBUG] Query result:`, user);
 
     res.json({
-      query: 'SELECT * FROM users WHERE username = $1',
+      query: 'SELECT * FROM users WHERE username = ?',
       params: [username],
       result: user,
       found: user.length > 0
