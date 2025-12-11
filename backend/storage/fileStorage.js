@@ -255,17 +255,32 @@ class FileStorage {
     const whereParams = params.slice(-whereParamCount);
     const setParams = params.slice(0, setClauses.length);
 
+    console.log(`🔧 UPDATE ${tableName}:`);
+    console.log(`   SET clauses: ${setClauses.length}`);
+    console.log(`   SET clauses: ${JSON.stringify(setClauses)}`);
+    console.log(`   WHERE clause: ${whereClause}`);
+    console.log(`   Total params: ${params.length}, Set params: ${setParams.length}, Where params: ${whereParams.length}`);
+    console.log(`   Set params values:`, setParams);
+    console.log(`   Where params values:`, whereParams);
+
     let changes = 0;
-    table.forEach(row => {
-      if (this.evaluateWhere(row, whereClause, whereParams)) {
+    table.forEach((row, rowIdx) => {
+      const whereMatches = this.evaluateWhere(row, whereClause, whereParams);
+      console.log(`   Row ${rowIdx}: id=${row.id}, whereMatches=${whereMatches}`);
+
+      if (whereMatches) {
+        console.log(`     ✓ Updating row ${rowIdx}...`);
         setClauses.forEach((setClause, idx) => {
           const [col] = setClause.split('=').map(s => s.trim());
+          const oldValue = row[col];
           row[col] = setParams[idx];
+          console.log(`       ${col}: ${oldValue} → ${setParams[idx]}`);
         });
         changes++;
       }
     });
 
+    console.log(`   Result: ${changes} rows updated`);
     return { changes };
   }
 
