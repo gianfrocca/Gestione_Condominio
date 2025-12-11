@@ -134,9 +134,18 @@ class FileStorage {
    */
   async runQuery(sql, params = []) {
     try {
+      console.log(`\n🟣 runQuery called`);
+      console.log(`   SQL: ${sql.substring(0, 80)}...`);
+      console.log(`   Params: ${JSON.stringify(params)}`);
+
       const result = this.executeSql(sql, params);
+      console.log(`   ✅ executeSql returned:`, result);
+
       // Salva i cambiamenti su file
+      console.log(`   💾 Saving to file...`);
       await this.saveToFile();
+      console.log(`   ✅ Saved to file`);
+
       return { id: result.lastId, changes: result.changes };
     } catch (error) {
       console.error('❌ Errore runQuery:', error);
@@ -156,13 +165,19 @@ class FileStorage {
 
     const sqlNormalized = sql.trim().toUpperCase();
 
+    console.log(`   🔷 executeSql - SQL type: ${sqlNormalized.substring(0, 20)}...`);
+
     if (sqlNormalized.startsWith('SELECT')) {
+      console.log(`   🔷 → Calling executeSelect`);
       return this.executeSelect(sql, params);
     } else if (sqlNormalized.startsWith('INSERT')) {
+      console.log(`   🔷 → Calling executeInsert`);
       return this.executeInsert(sql, params);
     } else if (sqlNormalized.startsWith('UPDATE')) {
+      console.log(`   🔷 → Calling executeUpdate`);
       return this.executeUpdate(sql, params);
     } else if (sqlNormalized.startsWith('DELETE')) {
+      console.log(`   🔷 → Calling executeDelete`);
       return this.executeDelete(sql, params);
     } else if (sqlNormalized.startsWith('CREATE')) {
       return { changes: 0 }; // CREATE TABLE non fa nulla in file storage
