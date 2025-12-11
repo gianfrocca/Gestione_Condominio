@@ -8,41 +8,63 @@ router.get('/', async (req, res) => {
   try {
     const { unit_id, meter_type, month, meter_id } = req.query;
 
-    let query = `
-      SELECT r.*, m.type as meter_type, m.meter_code, u.number as unit_number, u.name as unit_name
-      FROM readings r
-      JOIN meters m ON r.meter_id = m.id
-      JOIN units u ON m.unit_id = u.id
-      WHERE 1=1
-    `;
+    console.log(`🔵 GET readings called`);
+    console.log(`  Query params: unit_id=${unit_id}, meter_type=${meter_type}, month=${month}, meter_id=${meter_id}`);
+
+    // Start with all readings
+    let query = `SELECT * FROM readings WHERE 1=1`;
     const params = [];
 
     // CRITICAL: Filter by meter_id if provided (most specific filter)
     if (meter_id) {
-      query += ' AND r.meter_id = ?';
+      query += ' AND meter_id = ?';
       params.push(meter_id);
     }
 
-    if (unit_id) {
-      query += ' AND u.id = ?';
-      params.push(unit_id);
+    query += ' ORDER BY reading_date DESC';
+
+    console.log(`  Executing query with ${params.length} params:`, params);
+    let readings = await allQuery(query, params);
+    console.log(`  ✅ Got ${readings.length} readings`);
+
+    // If we need to filter by unit_id or meter_type, we need to fetch meter info
+    if (unit_id || meter_type) {
+      console.log(`  🔎 Filtering by unit_id=${unit_id}, meter_type=${meter_type}`);
+
+      // Get all meters that match the filters
+      let meterQuery = 'SELECT id, unit_id, type FROM meters WHERE 1=1';
+      const meterParams = [];
+
+      if (unit_id) {
+        meterQuery += ' AND unit_id = ?';
+        meterParams.push(unit_id);
+      }
+
+      if (meter_type) {
+        meterQuery += ' AND type = ?';
+        meterParams.push(meter_type);
+      }
+
+      const matchingMeters = await allQuery(meterQuery, meterParams);
+      const meterIds = new Set(matchingMeters.map(m => m.id));
+
+      // Filter readings to only those with matching meters
+      readings = readings.filter(r => meterIds.has(r.meter_id));
+      console.log(`  ✅ Filtered to ${readings.length} readings after meter filtering`);
     }
 
-    if (meter_type) {
-      query += ' AND m.type = ?';
-      params.push(meter_type);
-    }
-
+    // If month filter requested, apply it
     if (month) {
-      query += ' AND strftime("%Y-%m", r.reading_date) = ?';
-      params.push(month);
+      readings = readings.filter(r => {
+        const readingMonth = r.reading_date.substring(0, 7); // YYYY-MM
+        return readingMonth === month;
+      });
+      console.log(`  ✅ Filtered to ${readings.length} readings after month filtering`);
     }
 
-    query += ' ORDER BY r.reading_date DESC, u.number';
-
-    const readings = await allQuery(query, params);
     res.json(readings);
   } catch (error) {
+    console.error('❌ GET readings error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -52,27 +74,32 @@ router.post('/', async (req, res) => {
   try {
     const { meter_id, reading_date, value, notes } = req.body;
 
+    console.log(`🔵 POST single reading: meter_id=${meter_id}, date=${reading_date}, value=${value}`);
+
     if (!meter_id || !reading_date || value === undefined) {
+      console.error(`  ❌ Missing required fields`);
       return res.status(400).json({ error: 'Campi obbligatori: meter_id, reading_date, value' });
     }
 
+    console.log(`  💾 Inserting reading...`);
     const result = await runQuery(
       `INSERT INTO readings (meter_id, reading_date, value, notes)
        VALUES (?, ?, ?, ?)`,
       [meter_id, reading_date, value, notes || null]
     );
 
+    console.log(`  ✅ Reading inserted with ID: ${result.id}`);
+
+    console.log(`  📝 Fetching created reading...`);
     const newReading = await getQuery(
-      `SELECT r.*, m.type as meter_type, u.number as unit_number
-       FROM readings r
-       JOIN meters m ON r.meter_id = m.id
-       JOIN units u ON m.unit_id = u.id
-       WHERE r.id = ?`,
+      `SELECT * FROM readings WHERE id = ?`,
       [result.id]
     );
 
+    console.log(`  📊 Got reading:`, newReading);
     res.status(201).json(newReading);
   } catch (error) {
+    console.error('❌ POST single reading error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -164,10 +191,7 @@ router.post('/batch', async (req, res) => {
 
       // Verifica cosa è stato effettivamente salvato
       const savedReading = await getQuery(
-        `SELECT r.*, m.unit_id, m.type as meter_type
-         FROM readings r
-         JOIN meters m ON r.meter_id = m.id
-         WHERE r.id = ?`,
+        `SELECT * FROM readings WHERE id = ?`,
         [result.id]
       );
       console.log(`  📊 Verified saved reading:`, savedReading);

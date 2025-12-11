@@ -61,6 +61,23 @@ class FileStorage {
   }
 
   /**
+   * Ricarica i dati dal file (sincronizzazione dopo import)
+   * Essenziale dopo l'import di un nuovo database.json
+   */
+  async reload() {
+    try {
+      console.log(`🔄 Reloading FileStorage from disk...`);
+      const content = await fs.readFile(this.dataFile, 'utf-8');
+      this.data = JSON.parse(content);
+      this.initializeIdCounters();
+      console.log(`✅ FileStorage ricaricato da disco`);
+    } catch (error) {
+      console.error('❌ Errore reload FileStorage:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Inizializza i contatori degli ID basati sui dati caricati
    */
   initializeIdCounters() {
@@ -210,22 +227,43 @@ class FileStorage {
    */
   executeInsert(sql, params) {
     // Parse: INSERT INTO table (col1, col2) VALUES (?, ?)
-    const match = sql.match(/INSERT INTO\s+(\w+)\s*\((.+?)\)\s*VALUES/i);
+    const match = sql.match(/INSERT INTO\s+(\w+)\s*\((.+?)\)\s*VALUES/is);  // Added 's' flag for multiline
+
+    console.log(`🔵 executeInsert called`);
+    console.log(`   SQL: ${sql.substring(0, 100)}...`);
+    console.log(`   Regex match result:`, match ? 'MATCHED' : 'NO MATCH');
+
     if (!match) throw new Error('INSERT non valido');
 
     const tableName = match[1].toLowerCase();
-    const columns = match[2].split(',').map(c => c.trim().replace(/"/g, ''));
+    const rawColumns = match[2];
+
+    console.log(`   Table: ${tableName}`);
+    console.log(`   Raw columns from regex: "${rawColumns}"`);
+
+    const columns = rawColumns.split(',').map(c => c.trim().replace(/"/g, ''));
+
+    console.log(`   Parsed columns:`, columns);
+    console.log(`   Params:`, params);
 
     const table = this.data[tableName];
-    if (!table) throw new Error(`Tabella ${tableName} non esiste`);
+    if (!table) {
+      console.error(`   ❌ Table ${tableName} not found!`);
+      throw new Error(`Tabella ${tableName} non esiste`);
+    }
 
     // Crea il nuovo record
     const newRecord = { id: this.nextIds[tableName]++ };
+    console.log(`   Creating record with ID: ${newRecord.id}`);
+
     columns.forEach((col, idx) => {
       newRecord[col] = params[idx];
+      console.log(`     ${col} = ${params[idx]}`);
     });
 
+    console.log(`   Final record:`, newRecord);
     table.push(newRecord);
+    console.log(`   ✅ Record pushed to table. Table now has ${table.length} records`);
 
     return { lastId: newRecord.id, changes: 1 };
   }
