@@ -17,6 +17,9 @@ router.get('/', async (req, res) => {
     `;
     const params = [];
 
+    console.log(`🔵 GET readings called`);
+    console.log(`  Query params: unit_id=${unit_id}, meter_type=${meter_type}, month=${month}, meter_id=${meter_id}`);
+
     // CRITICAL: Filter by meter_id if provided (most specific filter)
     if (meter_id) {
       query += ' AND r.meter_id = ?';
@@ -40,9 +43,12 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY r.reading_date DESC, u.number';
 
+    console.log(`  Executing query with ${params.length} params:`, params);
     const readings = await allQuery(query, params);
+    console.log(`  ✅ Got ${readings.length} readings`);
     res.json(readings);
   } catch (error) {
+    console.error('❌ GET readings error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -52,16 +58,23 @@ router.post('/', async (req, res) => {
   try {
     const { meter_id, reading_date, value, notes } = req.body;
 
+    console.log(`🔵 POST single reading: meter_id=${meter_id}, date=${reading_date}, value=${value}`);
+
     if (!meter_id || !reading_date || value === undefined) {
+      console.error(`  ❌ Missing required fields`);
       return res.status(400).json({ error: 'Campi obbligatori: meter_id, reading_date, value' });
     }
 
+    console.log(`  💾 Inserting reading...`);
     const result = await runQuery(
       `INSERT INTO readings (meter_id, reading_date, value, notes)
        VALUES (?, ?, ?, ?)`,
       [meter_id, reading_date, value, notes || null]
     );
 
+    console.log(`  ✅ Reading inserted with ID: ${result.id}`);
+
+    console.log(`  📝 Fetching created reading...`);
     const newReading = await getQuery(
       `SELECT r.*, m.type as meter_type, u.number as unit_number
        FROM readings r
@@ -71,8 +84,10 @@ router.post('/', async (req, res) => {
       [result.id]
     );
 
+    console.log(`  📊 Got reading:`, newReading);
     res.status(201).json(newReading);
   } catch (error) {
+    console.error('❌ POST single reading error:', error);
     res.status(500).json({ error: error.message });
   }
 });
