@@ -75,10 +75,23 @@ export const getStorageInstance = () => {
   return storage;
 };
 
+/**
+ * Ricarica i dati dello storage dal file (per sincronizzazione dopo import)
+ */
+export const reloadStorage = async () => {
+  if (!storage) {
+    throw new Error('Storage non inizializzato. Chiama initializeStorage() prima.');
+  }
+  if (storage.reload) {
+    await storage.reload();
+  }
+};
+
 export default {
   initializeStorage,
   allQuery,
   getQuery,
   runQuery,
-  getStorageInstance
+  getStorageInstance,
+  reloadStorage
 };

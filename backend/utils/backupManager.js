@@ -9,6 +9,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getStorageInstance, allQuery } from '../database.js';
+import { reloadStorage } from '../storage/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BACKUPS_DIR = path.join(__dirname, '../../data/backups');
@@ -308,7 +309,12 @@ export const importDatabaseJSON = async (fileContent) => {
 
       // Scrivi il nuovo database
       await fs.writeFile(sourceFile, JSON.stringify(importedData, null, 2), 'utf-8');
-      console.log('✅ Database importato con successo');
+      console.log('✅ Database scritto su file');
+
+      // CRITICAMENTE IMPORTANTE: Ricaricare lo storage in memoria!
+      console.log('🔄 Ricaricare FileStorage in memoria...');
+      await reloadStorage();
+      console.log('✅ FileStorage sincronizzato');
 
       return {
         success: true,

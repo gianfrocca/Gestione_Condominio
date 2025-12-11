@@ -61,6 +61,23 @@ class FileStorage {
   }
 
   /**
+   * Ricarica i dati dal file (sincronizzazione dopo import)
+   * Essenziale dopo l'import di un nuovo database.json
+   */
+  async reload() {
+    try {
+      console.log(`🔄 Reloading FileStorage from disk...`);
+      const content = await fs.readFile(this.dataFile, 'utf-8');
+      this.data = JSON.parse(content);
+      this.initializeIdCounters();
+      console.log(`✅ FileStorage ricaricato da disco`);
+    } catch (error) {
+      console.error('❌ Errore reload FileStorage:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Inizializza i contatori degli ID basati sui dati caricati
    */
   initializeIdCounters() {
