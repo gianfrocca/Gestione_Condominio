@@ -11,14 +11,19 @@ router.get('/', async (req, res) => {
     console.log(`🔵 GET readings called`);
     console.log(`  Query params: unit_id=${unit_id}, meter_type=${meter_type}, month=${month}, meter_id=${meter_id}`);
 
-    // Start with all readings
-    let query = `SELECT * FROM readings WHERE 1=1`;
+    // Build WHERE clause conditionally (no dummy 1=1)
+    let query = `SELECT * FROM readings`;
     const params = [];
+    const conditions = [];
 
     // CRITICAL: Filter by meter_id if provided (most specific filter)
     if (meter_id) {
-      query += ' AND meter_id = ?';
+      conditions.push('meter_id = ?');
       params.push(meter_id);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY reading_date DESC';
@@ -31,18 +36,23 @@ router.get('/', async (req, res) => {
     if (unit_id || meter_type) {
       console.log(`  🔎 Filtering by unit_id=${unit_id}, meter_type=${meter_type}`);
 
-      // Get all meters that match the filters
-      let meterQuery = 'SELECT id, unit_id, type FROM meters WHERE 1=1';
+      // Build meters query conditionally (no dummy 1=1)
+      let meterQuery = 'SELECT id, unit_id, type FROM meters';
       const meterParams = [];
+      const meterConditions = [];
 
       if (unit_id) {
-        meterQuery += ' AND unit_id = ?';
+        meterConditions.push('unit_id = ?');
         meterParams.push(unit_id);
       }
 
       if (meter_type) {
-        meterQuery += ' AND type = ?';
+        meterConditions.push('type = ?');
         meterParams.push(meter_type);
+      }
+
+      if (meterConditions.length > 0) {
+        meterQuery += ' WHERE ' + meterConditions.join(' AND ');
       }
 
       const matchingMeters = await allQuery(meterQuery, meterParams);
