@@ -175,7 +175,7 @@ class FileStorage {
     let results = [...table];
 
     // Applica WHERE conditions semplici
-    const whereMatch = sql.match(/WHERE\s+(.+?)(?:ORDER BY|LIMIT|$)/i);
+    const whereMatch = sql.match(/WHERE\s+(.+?)(?:ORDER BY|LIMIT|$)/is);  // Added 's' flag for multiline
     if (whereMatch) {
       const whereClause = whereMatch[1];
       results = results.filter(row => this.evaluateWhere(row, whereClause, params));
@@ -236,8 +236,8 @@ class FileStorage {
   executeUpdate(sql, params) {
     // Parse semplice: UPDATE table SET col=? WHERE id=?
     const tableMatch = sql.match(/UPDATE\s+(\w+)/i);
-    const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/i);
-    const whereMatch = sql.match(/WHERE\s+(.+?)$/i);
+    const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/is);  // Added 's' flag for multiline matching
+    const whereMatch = sql.match(/WHERE\s+(.+?)$/is);     // Added 's' flag for multiline matching
 
     if (!tableMatch || !setMatch || !whereMatch) {
       throw new Error('UPDATE non valido');
@@ -289,7 +289,7 @@ class FileStorage {
    */
   executeDelete(sql, params) {
     const tableMatch = sql.match(/FROM\s+(\w+)/i);
-    const whereMatch = sql.match(/WHERE\s+(.+?)$/i);
+    const whereMatch = sql.match(/WHERE\s+(.+?)$/is);  // Added 's' flag for multiline
 
     if (!tableMatch) throw new Error('DELETE senza FROM');
 
