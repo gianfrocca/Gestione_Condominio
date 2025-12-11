@@ -23,7 +23,7 @@ router.post('/login', async (req, res) => {
 
     // Cerca l'utente nel database
     const user = await getQuery(
-      'SELECT * FROM users WHERE username = $1 AND is_active = 1',
+      'SELECT * FROM users WHERE username = ? AND is_active = 1',
       [username]
     );
 
@@ -46,7 +46,7 @@ router.post('/login', async (req, res) => {
 
     // Aggiorna last_login
     await runQuery(
-      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
+      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?',
       [user.id]
     );
 
@@ -96,7 +96,7 @@ router.post('/refresh', async (req, res) => {
 
     // Verifica che l'utente esista ancora e sia attivo
     const user = await getQuery(
-      'SELECT * FROM users WHERE id = $1 AND is_active = 1',
+      'SELECT * FROM users WHERE id = ? AND is_active = 1',
       [decoded.id]
     );
 
@@ -143,7 +143,7 @@ router.post('/logout', authenticate, async (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   try {
     const user = await getQuery(
-      'SELECT id, condominium_id, username, email, role, unit_id, full_name, phone, is_active, last_login, created_at FROM users WHERE id = $1',
+      'SELECT id, condominium_id, username, email, role, unit_id, full_name, phone, is_active, last_login, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -188,7 +188,7 @@ router.post('/change-password', authenticate, async (req, res) => {
 
     // Ottieni l'utente corrente
     const user = await getQuery(
-      'SELECT * FROM users WHERE id = $1',
+      'SELECT * FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -207,7 +207,7 @@ router.post('/change-password', authenticate, async (req, res) => {
 
     // Aggiorna la password
     await runQuery(
-      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      'UPDATE users SET password_hash = ? WHERE id = ?',
       [newPasswordHash, req.user.id]
     );
 
@@ -242,7 +242,7 @@ router.post('/reset-password-request', async (req, res) => {
 
     // Verifica che l'utente esista
     const user = await getQuery(
-      'SELECT * FROM users WHERE email = $1 AND is_active = 1',
+      'SELECT * FROM users WHERE email = ? AND is_active = 1',
       [email]
     );
 

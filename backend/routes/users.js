@@ -23,14 +23,18 @@ router.get('/', filterByCondominium, async (req, res) => {
       FROM users u
       LEFT JOIN condominiums c ON u.condominium_id = c.id
       LEFT JOIN units un ON u.unit_id = un.id
-      WHERE 1=1
     `;
     const params = [];
+    const conditions = [];
 
     // Se non è super-admin, filtra per condominio
     if (req.condominiumId) {
-      query += ' AND u.condominium_id = $1';
+      conditions.push('u.condominium_id = ?');
       params.push(req.condominiumId);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY u.created_at DESC';
@@ -61,7 +65,7 @@ router.get('/:id', async (req, res) => {
        FROM users u
        LEFT JOIN condominiums c ON u.condominium_id = c.id
        LEFT JOIN units un ON u.unit_id = un.id
-       WHERE u.id = $1`,
+       WHERE u.id = ?`,
       [req.params.id]
     );
 
@@ -255,7 +259,7 @@ router.put('/:id', authorize('super_admin', 'admin'), async (req, res) => {
       `SELECT u.id, u.condominium_id, u.username, u.email, u.role, u.unit_id,
               u.full_name, u.phone, u.is_active, u.last_login, u.created_at
        FROM users u
-       WHERE u.id = $1`,
+       WHERE u.id = ?`,
       [req.params.id]
     );
 

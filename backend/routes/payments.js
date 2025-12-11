@@ -12,23 +12,27 @@ router.get('/', async (req, res) => {
       SELECT p.*, u.number as unit_number, u.name as unit_name
       FROM payments p
       JOIN units u ON p.unit_id = u.id
-      WHERE 1=1
     `;
     const params = [];
+    const conditions = [];
 
     if (unit_id) {
-      sql += ' AND p.unit_id = ?';
+      conditions.push('p.unit_id = ?');
       params.push(unit_id);
     }
 
     if (start_date) {
-      sql += ' AND p.payment_date >= ?';
+      conditions.push('p.payment_date >= ?');
       params.push(start_date);
     }
 
     if (end_date) {
-      sql += ' AND p.payment_date <= ?';
+      conditions.push('p.payment_date <= ?');
       params.push(end_date);
+    }
+
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
     }
 
     sql += ' ORDER BY p.payment_date DESC';

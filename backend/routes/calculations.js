@@ -80,23 +80,27 @@ router.get('/history', async (req, res) => {
       SELECT ms.*, u.number as unit_number, u.name as unit_name
       FROM monthly_splits ms
       JOIN units u ON ms.unit_id = u.id
-      WHERE 1=1
     `;
     const params = [];
+    const conditions = [];
 
     if (month) {
-      query += ' AND strftime("%Y-%m", ms.month) = ?';
+      conditions.push('strftime("%Y-%m", ms.month) = ?');
       params.push(month);
     }
 
     if (year) {
-      query += ' AND strftime("%Y", ms.month) = ?';
+      conditions.push('strftime("%Y", ms.month) = ?');
       params.push(year);
     }
 
     if (unit_id) {
-      query += ' AND ms.unit_id = ?';
+      conditions.push('ms.unit_id = ?');
       params.push(unit_id);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY ms.month DESC, u.number';
