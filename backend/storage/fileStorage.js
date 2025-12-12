@@ -97,16 +97,29 @@ class FileStorage {
   async saveToFile() {
     try {
       console.log(`\n💾 saveToFile() called`);
-      console.log(`   Readings table has ${this.data.readings?.length || 0} records`);
+      console.log(`   📊 Data summary before save:`);
+      console.log(`     - Readings: ${this.data.readings?.length || 0} records`);
+      console.log(`     - Bills: ${this.data.bills?.length || 0} records`);
+      console.log(`     - Meters: ${this.data.meters?.length || 0} records`);
+      console.log(`     - Units: ${this.data.units?.length || 0} records`);
+
       if (this.data.readings && this.data.readings.length > 0) {
-        console.log(`   First reading:`, this.data.readings[0]);
+        console.log(`     - First reading:`, this.data.readings[0]);
+      }
+      if (this.data.bills && this.data.bills.length > 0) {
+        console.log(`     - First bill:`, this.data.bills[0]);
       }
 
       const jsonContent = JSON.stringify(this.data, null, 2);
       console.log(`   File size: ${jsonContent.length} bytes`);
+      console.log(`   Writing to file: ${this.dataFile}`);
 
       await fs.writeFile(this.dataFile, jsonContent, 'utf-8');
       console.log(`   ✅ File written successfully`);
+
+      // Verifica che il file sia stato scritto
+      const stats = await fs.stat(this.dataFile);
+      console.log(`   📁 File stats - Size: ${stats.size} bytes, Mode: ${stats.mode}`);
     } catch (error) {
       console.error('❌ Errore salvataggio su file:', error);
       throw error;
