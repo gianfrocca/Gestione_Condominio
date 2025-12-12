@@ -788,7 +788,8 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
     if (type === 'gas' || type === 'both') {
       const gasBills = await allQuery(
         `SELECT SUM(amount) as total FROM bills
-         WHERE type = 'gas' AND bill_date >= ? AND bill_date <= ?`,
+         WHERE (type = 'gas' OR type = 'Metano' OR type = 'Gas')
+         AND bill_period_end >= ? AND bill_period_start <= ?`,
         [dateFrom, dateTo]
       );
       totalGasCost = gasBills[0]?.total || 0;
@@ -802,7 +803,8 @@ export async function calculateMonthlySplit(dateFrom, dateTo, type = 'both') {
     if (type === 'electricity' || type === 'both') {
       const elecBills = await allQuery(
         `SELECT SUM(amount) as total FROM bills
-         WHERE type = 'electricity' AND bill_date >= ? AND bill_date <= ?`,
+         WHERE (type = 'electricity' OR type = 'Energia' OR type = 'Energia Elettrica')
+         AND bill_period_end >= ? AND bill_period_start <= ?`,
         [dateFrom, dateTo]
       );
       totalElecCost = elecBills[0]?.total || 0;
