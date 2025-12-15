@@ -215,6 +215,7 @@ class FileStorage {
   executeSelect(sql, params) {
     // Parse semplice per SELECT - supporta la struttura base
     // SELECT col FROM table WHERE condition
+    // Supporta anche funzioni di aggregazione: SUM(), COUNT(), AVG(), MIN(), MAX()
 
     const fromMatch = sql.match(/FROM\s+(\w+)/i);
     if (!fromMatch) throw new Error('SELECT senza FROM');
@@ -242,6 +243,63 @@ class FileStorage {
     if (whereMatch) {
       const whereClause = whereMatch[1];
       results = results.filter(row => this.evaluateWhere(row, whereClause, params));
+    }
+
+    // Controlla se è una query di aggregazione
+    const sumMatch = sql.match(/SELECT\s+SUM\s*\(\s*(\w+)\s*\)\s+(?:as|AS)\s+(\w+)/i);
+    const countMatch = sql.match(/SELECT\s+COUNT\s*\(\s*(\w+|\*)\s*\)\s+(?:as|AS)\s+(\w+)/i);
+    const avgMatch = sql.match(/SELECT\s+AVG\s*\(\s*(\w+)\s*\)\s+(?:as|AS)\s+(\w+)/i);
+    const minMatch = sql.match(/SELECT\s+MIN\s*\(\s*(\w+)\s*\)\s+(?:as|AS)\s+(\w+)/i);
+    const maxMatch = sql.match(/SELECT\s+MAX\s*\(\s*(\w+)\s*\)\s+(?:as|AS)\s+(\w+)/i);
+
+    if (sumMatch) {
+      const column = sumMatch[1];
+      const alias = sumMatch[2];
+      const total = results.reduce((sum, row) => sum + (parseFloat(row[column]) || 0), 0);
+      const aggregateResult = {};
+      aggregateResult[alias] = total;
+      console.log(`   🟢 executeSelect returning SUM aggregation: ${alias}=${total}`);
+      return [aggregateResult];
+    }
+
+    if (countMatch) {
+      const alias = countMatch[2];
+      const count = results.length;
+      const aggregateResult = {};
+      aggregateResult[alias] = count;
+      console.log(`   🟢 executeSelect returning COUNT aggregation: ${alias}=${count}`);
+      return [aggregateResult];
+    }
+
+    if (avgMatch) {
+      const column = avgMatch[1];
+      const alias = avgMatch[2];
+      const sum = results.reduce((acc, row) => acc + (parseFloat(row[column]) || 0), 0);
+      const average = results.length > 0 ? sum / results.length : 0;
+      const aggregateResult = {};
+      aggregateResult[alias] = average;
+      console.log(`   🟢 executeSelect returning AVG aggregation: ${alias}=${average}`);
+      return [aggregateResult];
+    }
+
+    if (minMatch) {
+      const column = minMatch[1];
+      const alias = minMatch[2];
+      const min = results.length > 0 ? Math.min(...results.map(row => parseFloat(row[column]) || Infinity)) : null;
+      const aggregateResult = {};
+      aggregateResult[alias] = min === Infinity ? null : min;
+      console.log(`   🟢 executeSelect returning MIN aggregation: ${alias}=${min}`);
+      return [aggregateResult];
+    }
+
+    if (maxMatch) {
+      const column = maxMatch[1];
+      const alias = maxMatch[2];
+      const max = results.length > 0 ? Math.max(...results.map(row => parseFloat(row[column]) || -Infinity)) : null;
+      const aggregateResult = {};
+      aggregateResult[alias] = max === -Infinity ? null : max;
+      console.log(`   🟢 executeSelect returning MAX aggregation: ${alias}=${max}`);
+      return [aggregateResult];
     }
 
     // Applica ORDER BY
@@ -415,6 +473,7 @@ class FileStorage {
    */
   evaluateWhere(row, whereClause, params) {
     // Supporta: column = ? AND column != ? WHERE id = ?
+    // Supporta anche: (col = value OR col = value) AND col >= value
     let paramIndex = 0;
     let clause = whereClause;
 
@@ -425,39 +484,57 @@ class FileStorage {
       return param;
     });
 
-    // Valuta le condizioni
-    // Semplice: id = 1, username = 'admin', is_active = 1, etc.
-    const conditions = clause.split(/\s+AND\s+/i);
+    // Valuta le condizioni - separa per AND
+    // Ogni AND-group può contenere OR conditions
+    const andGroups = clause.split(/\s+AND\s+/i);
 
-    return conditions.every(condition => {
-      const parts = condition.match(/(\w+)\s*(=|!=|<|>|<=|>=)\s*(.+)/);
-      if (!parts) return true;
+    return andGroups.every(andGroup => {
+      // Se il group contiene OR, valuta le condizioni OR
+      if (/\s+OR\s+/i.test(andGroup)) {
+        // Rimuovi le parentesi esterne se presenti
+        const orContent = andGroup.replace(/^\s*\(\s*/, '').replace(/\s*\)\s*$/, '');
+        const orConditions = orContent.split(/\s+OR\s+/i);
 
-      const [, column, operator, value] = parts;
-      const rowValue = row[column.toLowerCase()];
-      const compareValue = value.replace(/'/g, '');
-
-      // Normalizza i valori per il confronto
-      const normalizedRowValue = this.normalizeValue(rowValue);
-      const normalizedCompareValue = this.normalizeValue(compareValue);
-
-      switch (operator) {
-        case '=':
-          return normalizedRowValue === normalizedCompareValue;
-        case '!=':
-          return normalizedRowValue !== normalizedCompareValue;
-        case '<':
-          return normalizedRowValue < normalizedCompareValue;
-        case '>':
-          return normalizedRowValue > normalizedCompareValue;
-        case '<=':
-          return normalizedRowValue <= normalizedCompareValue;
-        case '>=':
-          return normalizedRowValue >= normalizedCompareValue;
-        default:
-          return true;
+        return orConditions.some(condition => {
+          return this.evaluateSingleCondition(row, condition.trim());
+        });
+      } else {
+        // Valuta una singola condizione
+        return this.evaluateSingleCondition(row, andGroup.trim());
       }
     });
+  }
+
+  evaluateSingleCondition(row, condition) {
+    // Estrae e valuta una singola condizione: column operator value
+    // IMPORTANTE: operatori ordered from longest to shortest to match correctly (e.g. >= before >)
+    const parts = condition.match(/(\w+)\s*(<=|>=|!=|=|<|>)\s*(.+)/);
+    if (!parts) return true;
+
+    const [, column, operator, value] = parts;
+    const rowValue = row[column.toLowerCase()];
+    const compareValue = value.replace(/'/g, '');
+
+    // Normalizza i valori per il confronto
+    const normalizedRowValue = this.normalizeValue(rowValue);
+    const normalizedCompareValue = this.normalizeValue(compareValue);
+
+    switch (operator) {
+      case '=':
+        return normalizedRowValue === normalizedCompareValue;
+      case '!=':
+        return normalizedRowValue !== normalizedCompareValue;
+      case '<':
+        return normalizedRowValue < normalizedCompareValue;
+      case '>':
+        return normalizedRowValue > normalizedCompareValue;
+      case '<=':
+        return normalizedRowValue <= normalizedCompareValue;
+      case '>=':
+        return normalizedRowValue >= normalizedCompareValue;
+      default:
+        return true;
+    }
   }
 }
 
