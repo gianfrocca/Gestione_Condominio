@@ -78,11 +78,17 @@ class FileStorage {
   }
 
   /**
-   * Resetta il database - elimina il file e ricrea da zero
+   * Resetta il database - elimina il file e ricrea da zero PRESERVANDO gli utenti
    */
   async reset() {
     try {
       console.log(`🔴 RESETTING DATABASE...`);
+
+      // Salva gli utenti attuali prima di resettare
+      const preservedUsers = this.data.users || [];
+      const preservedCondominiums = this.data.condominiums || [];
+
+      console.log(`💾 Preservando ${preservedUsers.length} utenti e ${preservedCondominiums.length} condominii`);
 
       // Elimina il file se esiste
       try {
@@ -94,10 +100,10 @@ class FileStorage {
         }
       }
 
-      // Reinizializza i dati
+      // Reinizializza i dati ma preserva utenti e condominii
       this.data = {
-        condominiums: [],
-        users: [],
+        condominiums: preservedCondominiums,
+        users: preservedUsers,
         units: [],
         meters: [],
         readings: [],
@@ -109,11 +115,11 @@ class FileStorage {
       };
       this.nextIds = {};
 
-      // Salva il file vuoto
+      // Salva il file con i dati resettati
       await this.saveToFile();
-      console.log(`✅ Database resettato - struttura ricreata`);
+      console.log(`✅ Database resettato - struttura ricreata con utenti preservati`);
 
-      return { success: true, message: 'Database resettato con successo' };
+      return { success: true, message: 'Database resettato con successo. Utenti preservati.' };
     } catch (error) {
       console.error('❌ Errore reset database:', error);
       throw error;
