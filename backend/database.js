@@ -278,15 +278,15 @@ const createDefaultData = async () => {
   for (const [key, value, description] of defaultSettings) {
     // Controlla se la setting già esiste
     const existing = await getQuery(
-      `SELECT key FROM settings WHERE key = $1 AND condominium_id = 1`,
-      [key]
+      `SELECT key FROM settings WHERE key = ? AND condominium_id = ?`,
+      [key, 1]
     );
 
     if (!existing) {
       await runQuery(
         `INSERT INTO settings (key, condominium_id, value, description)
-         VALUES ($1, 1, $2, $3)`,
-        [key, value, description]
+         VALUES (?, ?, ?, ?)`,
+        [key, 1, value, description]
       );
     }
   }
