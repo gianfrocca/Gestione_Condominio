@@ -46,7 +46,7 @@ router.post('/calculate', async (req, res) => {
     // Pulisci NaN e Infinity dai risultati (JSON non supporta questi valori)
     const cleanResult = JSON.parse(JSON.stringify(result, (key, value) => {
       if (typeof value === 'number') {
-        if (!isFinite(value)) return null; // NaN, Infinity → null
+        if (!isFinite(value)) return 0; // NaN, Infinity → 0
       }
       return value;
     }));
