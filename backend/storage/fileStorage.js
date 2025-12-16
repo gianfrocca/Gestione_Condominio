@@ -216,14 +216,16 @@ class FileStorage {
     // Parse semplice per SELECT - supporta la struttura base
     // SELECT col FROM table WHERE condition
     // Supporta anche funzioni di aggregazione: SUM(), COUNT(), AVG(), MIN(), MAX()
+    // Supporta anche LEFT JOIN: FROM table1 LEFT JOIN table2 ON condition
 
-    const fromMatch = sql.match(/FROM\s+(\w+)/i);
+    const fromMatch = sql.match(/FROM\s+(\w+)(?:\s+(\w+))?\s*(?:LEFT\s+JOIN|INNER\s+JOIN)?/i);
     if (!fromMatch) throw new Error('SELECT senza FROM');
 
     const tableName = fromMatch[1].toLowerCase();
+    const tableAlias = fromMatch[2]?.toLowerCase() || tableName;
     const table = this.data[tableName];
 
-    console.log(`   🟢 executeSelect: table=${tableName}, table exists=${!!table}`);
+    console.log(`   🟢 executeSelect: table=${tableName}${tableAlias !== tableName ? ` (alias ${tableAlias})` : ''}, table exists=${!!table}`);
     if (table) {
       console.log(`   🟢 Table has ${table.length} records`);
       if (table.length > 0) {
@@ -238,11 +240,122 @@ class FileStorage {
 
     let results = [...table];
 
+    // CRITICAL: Controlla se c'è un LEFT JOIN
+    const joinMatch = sql.match(/LEFT\s+JOIN\s+(\w+)(?:\s+(\w+))?\s+ON\s+(.+?)(?:WHERE|GROUP|ORDER|$)/is);
+    if (joinMatch) {
+      const joinTableName = joinMatch[1].toLowerCase();
+      const joinTableAlias = joinMatch[2]?.toLowerCase() || joinTableName;
+      const onCondition = joinMatch[3].trim();
+
+      console.log(`   🔗 LEFT JOIN detected: ${joinTableName} (alias ${joinTableAlias}) ON ${onCondition}`);
+
+      const joinTable = this.data[joinTableName];
+      if (!joinTable) {
+        throw new Error(`LEFT JOIN: Tabella ${joinTableName} non trovata`);
+      }
+
+      // Parsa la condizione ON (es: u.id = m.unit_id)
+      const onMatch = onCondition.match(/(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)/i);
+      if (!onMatch) {
+        throw new Error(`LEFT JOIN: Condizione ON non parsabile: ${onCondition}`);
+      }
+
+      const leftTable = onMatch[1].toLowerCase();
+      const leftCol = onMatch[2].toLowerCase();
+      const rightTable = onMatch[3].toLowerCase();
+      const rightCol = onMatch[4].toLowerCase();
+
+      console.log(`   🔗 ON condition parsed: ${leftTable}.${leftCol} = ${rightTable}.${rightCol}`);
+
+      // Mappa gli alias ai nomi reali
+      const tableMapping = {
+        [tableAlias]: tableName,
+        [joinTableAlias]: joinTableName
+      };
+
+      // Determina quale colonna è da quale tabella
+      // Se leftTable è l'alias della tabella principale, leftCol è il campo della sinistra, rightCol è della destra
+      const sourceCol = leftTable === tableAlias ? leftCol : rightCol;
+      const joinCol = rightTable === joinTableAlias ? rightCol : leftCol;
+
+      console.log(`   🔗 Joining: for each row in ${tableName}, find rows in ${joinTableName} where ${tableName}.${sourceCol} = ${joinTableName}.${joinCol}`);
+
+      // Esegui il LEFT JOIN
+      const joinedResults = [];
+      for (const leftRow of results) {
+        const leftValue = leftRow[sourceCol];
+
+        // Cerca i match nella tabella destra
+        const matchingRows = joinTable.filter(rightRow => rightRow[joinCol] == leftValue); // Use == for loose comparison
+
+        if (matchingRows.length > 0) {
+          // Una riga sinistra può joinarsi con multiple righe destre
+          for (const rightRow of matchingRows) {
+            const joinedRow = { ...leftRow };
+
+            // Aggiungi i campi dalla tabella destra con il prefisso alias
+            for (const [key, value] of Object.entries(rightRow)) {
+              joinedRow[`${joinTableAlias}_${key}`] = value;
+              // Aggiungi anche senza prefisso se non conflitto
+              if (!(key in joinedRow)) {
+                joinedRow[key] = value;
+              }
+            }
+
+            joinedResults.push(joinedRow);
+          }
+        } else {
+          // LEFT JOIN: mantieni la riga sinistra anche senza match
+          joinedResults.push(leftRow);
+        }
+      }
+
+      console.log(`   🔗 LEFT JOIN result: ${results.length} rows → ${joinedResults.length} rows after join`);
+      results = joinedResults;
+    }
+
     // Applica WHERE conditions semplici
     const whereMatch = sql.match(/WHERE\s+(.+?)(?:ORDER BY|LIMIT|$)/is);  // Added 's' flag for multiline
     if (whereMatch) {
       const whereClause = whereMatch[1];
       results = results.filter(row => this.evaluateWhere(row, whereClause, params));
+    }
+
+    // CRITICAL: Parsa i SELECT aliases (es: m.id as meter_id, m.type as meter_type)
+    const selectMatch = sql.match(/SELECT\s+(.+?)\s+FROM/i);
+    if (selectMatch) {
+      const selectColumns = selectMatch[1];
+
+      // Trova tutti gli alias "AS alias"
+      const aliasMatches = [...selectColumns.matchAll(/(\w+\.\w+|\w+)\s+(?:as|AS)\s+(\w+)/g)];
+
+      if (aliasMatches.length > 0) {
+        console.log(`   🔀 Applying SELECT aliases:`);
+
+        results = results.map(row => {
+          const newRow = { ...row };
+
+          for (const match of aliasMatches) {
+            const sourceField = match[1]; // es: m.id o m.type
+            const aliasName = match[2];  // es: meter_id, meter_type
+
+            // Se il campo ha un prefisso (es: m.id), estrai il nome senza prefisso
+            const [prefix, field] = sourceField.includes('.')
+              ? sourceField.split('.')
+              : [null, sourceField];
+
+            // Se c'è un prefisso, guarda il campo con il prefisso alias (es: m_id)
+            const lookupField = prefix ? `${prefix}_${field}` : field;
+
+            if (lookupField in newRow && !(aliasName in newRow)) {
+              newRow[aliasName] = newRow[lookupField];
+              console.log(`     ${lookupField} → ${aliasName}`);
+            }
+          }
+
+          return newRow;
+        });
+      }
     }
 
     // Controlla se è una query di aggregazione

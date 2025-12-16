@@ -72,7 +72,46 @@ router.get('/', async (req, res) => {
       console.log(`  ✅ Filtered to ${readings.length} readings after month filtering`);
     }
 
-    res.json(readings);
+    // CRITICAL: Enrich readings with unit and meter information for display
+    console.log(`  🔎 Enriching ${readings.length} readings with unit/meter information...`);
+    const enrichedReadings = [];
+
+    for (const reading of readings) {
+      // Get meter info
+      const meter = await getQuery('SELECT id, unit_id, type, meter_code FROM meters WHERE id = ?', [reading.meter_id]);
+
+      if (meter) {
+        // Get unit info
+        const unit = await getQuery('SELECT id, number, name FROM units WHERE id = ?', [meter.unit_id]);
+
+        // Enrich reading with unit/meter info
+        const enriched = {
+          ...reading,
+          meter_id: reading.meter_id,
+          meter_type: meter.type,
+          meter_code: meter.meter_code,
+          unit_id: meter.unit_id,
+          unit_number: unit?.number || '-',
+          unit_name: unit?.name || '-'
+        };
+
+        enrichedReadings.push(enriched);
+        console.log(`    ✅ Enriched reading ${reading.id}: unit=${unit?.number}, name=${unit?.name}, meter_type=${meter.type}`);
+      } else {
+        console.warn(`    ⚠️ Meter ${reading.meter_id} not found for reading ${reading.id}`);
+        // Still include the reading without unit info
+        enrichedReadings.push({
+          ...reading,
+          meter_type: null,
+          unit_id: null,
+          unit_number: '-',
+          unit_name: '-'
+        });
+      }
+    }
+
+    console.log(`  ✅ Enriched all readings with unit information`);
+    res.json(enrichedReadings);
   } catch (error) {
     console.error('❌ GET readings error:', error);
     res.status(500).json({ error: error.message });
