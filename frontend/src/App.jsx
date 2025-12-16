@@ -107,7 +107,7 @@ function MainLayout() {
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
           <div className="text-xs text-gray-500 text-center">
-            <p>Gestione Condominio v2.0</p>
+            <p>Gestione Condominio v2.0.01</p>
             <p className="mt-1">© 2025 - Tutti i diritti riservati</p>
           </div>
         </div>

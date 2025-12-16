@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileDown, Calculator } from 'lucide-react';
 import { calculationsAPI, reportsAPI } from '../services/api';
 import { format } from 'date-fns';
@@ -15,6 +15,54 @@ function Reports() {
   const [calculating, setCalculating] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [calculationResult, setCalculationResult] = useState(null);
+
+  // Load persisted calculation on mount and when dateFrom changes
+  useEffect(() => {
+    loadPersistedCalculation();
+  }, [dateFrom]);
+
+  const loadPersistedCalculation = async () => {
+    try {
+      // Extract year-month from dateFrom (e.g., "2025-11-01" → "2025-11")
+      const month = dateFrom.substring(0, 7);
+      const { data } = await calculationsAPI.getHistory({ month });
+
+      if (data && data.length > 0) {
+        // Convert database format to calculation result format
+        const units = data.map((split) => ({
+          unit_id: split.unit_id,
+          unit_number: split.unit_number,
+          unit_name: split.unit_name,
+          costs: {
+            gas_heating: split.cost_gas_heating || 0,
+            gas_hot_water: split.cost_gas_hot_water || 0,
+            elec_heating: split.cost_elec_heating || 0,
+            elec_hot_water: split.cost_elec_hot_water || 0,
+            elec_cooling: split.cost_elec_cooling || 0,
+            elec_cold_water: split.cost_elec_cold_water || 0,
+            elec_fixed: split.cost_elec_fixed || 0,
+            total: split.total_cost || 0
+          }
+        }));
+
+        // Calculate totals
+        const total_gas_cost = units.reduce((sum, u) => sum + (u.costs.gas_heating + u.costs.gas_hot_water), 0);
+        const total_elec_cost = units.reduce((sum, u) => sum + (u.costs.elec_heating + u.costs.elec_hot_water + u.costs.elec_cooling + u.costs.elec_cold_water + u.costs.elec_fixed), 0);
+
+        setCalculationResult({
+          units,
+          total_gas_cost,
+          total_elec_cost,
+          total_cost: total_gas_cost + total_elec_cost
+        });
+      } else {
+        setCalculationResult(null);
+      }
+    } catch (error) {
+      console.log('No persisted calculation found for this month:', error);
+      setCalculationResult(null);
+    }
+  };
 
   const handleCalculate = async () => {
     try {
