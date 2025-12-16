@@ -1,6 +1,6 @@
 import express from 'express';
 import { calculateMonthlySplit } from '../utils/calculator.js';
-import { allQuery, runQuery } from '../database.js';
+import { allQuery, runQuery, getQuery } from '../database.js';
 import { getDebugCalculation, runCalculationTests } from '../controllers/debugController.js';
 import { authenticate } from '../middleware/auth.js';
 
@@ -84,38 +84,54 @@ router.get('/history', async (req, res) => {
   try {
     const { month, unit_id, year } = req.query;
 
-    let query = `
-      SELECT ms.*, u.number as unit_number, u.name as unit_name
-      FROM monthly_splits ms
-      JOIN units u ON ms.unit_id = u.id
-    `;
-    const params = [];
-    const conditions = [];
+    // Ottieni i monthly_splits
+    let allSplits = await allQuery('SELECT * FROM monthly_splits ORDER BY month DESC, unit_id');
 
+    // Filtra per month se specificato (formato YYYY-MM)
     if (month) {
-      conditions.push('strftime("%Y-%m", ms.month) = ?');
-      params.push(month);
+      allSplits = allSplits.filter(split => {
+        const splitMonth = split.month.substring(0, 7); // Estrai YYYY-MM
+        return splitMonth === month;
+      });
     }
 
+    // Filtra per year se specificato (formato YYYY)
     if (year) {
-      conditions.push('strftime("%Y", ms.month) = ?');
-      params.push(year);
+      allSplits = allSplits.filter(split => {
+        const splitYear = split.month.substring(0, 4); // Estrai YYYY
+        return splitYear === year;
+      });
     }
 
+    // Filtra per unit_id se specificato
     if (unit_id) {
-      conditions.push('ms.unit_id = ?');
-      params.push(unit_id);
+      allSplits = allSplits.filter(split => split.unit_id == unit_id);
     }
 
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
+    // Enrichisci con unit information (JOIN manuale)
+    const enrichedSplits = [];
+    for (const split of allSplits) {
+      const unit = await getQuery('SELECT id, number, name FROM units WHERE id = ?', [split.unit_id]);
+
+      if (unit) {
+        enrichedSplits.push({
+          ...split,
+          unit_number: unit.number,
+          unit_name: unit.name
+        });
+      } else {
+        enrichedSplits.push({
+          ...split,
+          unit_number: '-',
+          unit_name: '-'
+        });
+      }
     }
 
-    query += ' ORDER BY ms.month DESC, u.number';
-
-    const history = await allQuery(query, params);
-    res.json(history);
+    console.log(`GET /history: Returning ${enrichedSplits.length} splits (month=${month}, year=${year}, unit_id=${unit_id})`);
+    res.json(enrichedSplits);
   } catch (error) {
+    console.error('❌ GET /history error:', error);
     res.status(500).json({ error: error.message });
   }
 });
