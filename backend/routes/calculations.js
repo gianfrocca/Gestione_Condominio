@@ -43,8 +43,16 @@ router.post('/calculate', async (req, res) => {
 
     const result = await calculateMonthlySplit(dateFrom, dateTo, type);
 
+    // Pulisci NaN e Infinity dai risultati (JSON non supporta questi valori)
+    const cleanResult = JSON.parse(JSON.stringify(result, (key, value) => {
+      if (typeof value === 'number') {
+        if (!isFinite(value)) return null; // NaN, Infinity → null
+      }
+      return value;
+    }));
+
     // Salva nel database lo storico (usa data inizio come riferimento)
-    for (const unit of result.units) {
+    for (const unit of cleanResult.units) {
       await runQuery(
         `INSERT OR REPLACE INTO monthly_splits
          (month, unit_id, cost_gas_heating, cost_gas_hot_water, cost_elec_heating,
@@ -65,7 +73,7 @@ router.post('/calculate', async (req, res) => {
       );
     }
 
-    res.json(result);
+    res.json(cleanResult);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

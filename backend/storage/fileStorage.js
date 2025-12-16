@@ -332,7 +332,8 @@ class FileStorage {
    */
   executeInsert(sql, params) {
     // Parse: INSERT INTO table (col1, col2) VALUES (?, ?)
-    const match = sql.match(/INSERT INTO\s+(\w+)\s*\((.+?)\)\s*VALUES/is);  // Added 's' flag for multiline
+    // Supporta anche: INSERT OR REPLACE INTO table (col1, col2) VALUES (?, ?)
+    const match = sql.match(/INSERT(?:\s+OR\s+REPLACE)?\s+INTO\s+(\w+)\s*\((.+?)\)\s*VALUES/is);
 
     console.log(`🔵 executeInsert called`);
     console.log(`   SQL: ${sql.substring(0, 100)}...`);
