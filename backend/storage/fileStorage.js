@@ -78,6 +78,49 @@ class FileStorage {
   }
 
   /**
+   * Resetta il database - elimina il file e ricrea da zero
+   */
+  async reset() {
+    try {
+      console.log(`🔴 RESETTING DATABASE...`);
+
+      // Elimina il file se esiste
+      try {
+        await fs.unlink(this.dataFile);
+        console.log(`🗑️ File database.json eliminato`);
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          throw err;
+        }
+      }
+
+      // Reinizializza i dati
+      this.data = {
+        condominiums: [],
+        users: [],
+        units: [],
+        meters: [],
+        readings: [],
+        bills: [],
+        settings: [],
+        fixed_costs: [],
+        monthly_splits: [],
+        payments: []
+      };
+      this.nextIds = {};
+
+      // Salva il file vuoto
+      await this.saveToFile();
+      console.log(`✅ Database resettato - struttura ricreata`);
+
+      return { success: true, message: 'Database resettato con successo' };
+    } catch (error) {
+      console.error('❌ Errore reset database:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Inizializza i contatori degli ID basati sui dati caricati
    */
   initializeIdCounters() {

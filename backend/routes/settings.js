@@ -1,5 +1,6 @@
 import express from 'express';
-import { allQuery, getQuery, runQuery } from '../database.js';
+import { allQuery, getQuery, runQuery, getStorageInstance } from '../database.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -80,6 +81,35 @@ router.put('/', async (req, res) => {
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// POST: Resetta il database (SOLO ADMIN)
+router.post('/reset-database', authenticate, async (req, res) => {
+  try {
+    // Verifica che sia un admin
+    const user = req.user; // Aggiunto dal middleware authenticate
+    // Presumo che il middleware authenticate popoli req.user
+
+    console.log(`\n🔴 RESET DATABASE REQUESTED by user ${user?.username || 'unknown'}`);
+
+    // Chiama il metodo reset dello storage
+    const storage = getStorageInstance();
+    const result = await storage.reset();
+
+    console.log(`✅ Database resettato`);
+
+    // Ritorna un messaggio di successo
+    res.json({
+      success: true,
+      message: 'Database resettato con successo. La pagina verrà ricaricata...'
+    });
+  } catch (error) {
+    console.error('❌ Errore reset database:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Errore durante il reset del database: ' + error.message
+    });
   }
 });
 

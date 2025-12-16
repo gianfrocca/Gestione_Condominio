@@ -1105,6 +1105,63 @@ function Settings() {
             </div>
           </div>
 
+          {/* Reset Database */}
+          <div className="card bg-red-50 border border-red-200">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <Database className="h-5 w-5 mr-2 text-red-600" />
+              <span className="text-red-600">Resetta Database</span>
+            </h2>
+            <p className="text-sm text-red-700 mb-4">
+              Elimina tutti i dati e ricrea un database pulito con la struttura iniziale.
+            </p>
+            <div>
+              <button
+                onClick={async () => {
+                  if (!confirm('⚠️ ATTENZIONE: Questa operazione eliminerà TUTTI i dati!\n\nSicuro di voler resettare il database?')) {
+                    return;
+                  }
+
+                  if (!confirm('🔴 ULTIMA CONFERMA: Tutti i dati verranno eliminati permanentemente. Continuare?')) {
+                    return;
+                  }
+
+                  try {
+                    const response = await fetch('/api/settings/reset-database', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                      }
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                      alert('✅ Database resettato con successo!\n\nLa pagina verrà ricaricata...');
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 1000);
+                    } else {
+                      alert('❌ Errore: ' + result.error);
+                    }
+                  } catch (error) {
+                    console.error('Errore reset database:', error);
+                    alert('❌ Errore durante il reset: ' + error.message);
+                  }
+                }}
+                className="btn-danger w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                <span>🔴 Resetta Database</span>
+              </button>
+            </div>
+
+            <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-lg">
+              <p className="text-sm text-red-900">
+                <strong>⚠️ AVVERTENZA:</strong> Il reset eliminerà TUTTI i dati (unità, letture, bollette, calcoli, ecc.). Non è reversibile se non hai un backup! Usa il pulsante "Esporta JSON" prima di resettare.
+              </p>
+            </div>
+          </div>
+
           {/* Export Excel */}
           <div className="card">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
